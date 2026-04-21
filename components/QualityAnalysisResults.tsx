@@ -95,6 +95,35 @@ ${analysis.columns.map((c) => `- ${c.name}: ${c.dataType}, ${c.missingPercentage
     },
   }
 
+  const getReadinessStatus = (score: number) => {
+    if (score >= 80) return {
+      label: 'Ready for Training',
+      desc: 'This dataset meets high-quality standards and is suitable for model development.',
+      color: 'text-green-600 dark:text-green-400',
+      bgColor: 'bg-green-500/10',
+      borderColor: 'border-green-500/20',
+      icon: <CheckCircle className="h-5 w-5" />
+    }
+    if (score >= 50) return {
+      label: 'Needs Cleaning',
+      desc: 'Minor quality issues detected. We recommend addressing the flagged items before training.',
+      color: 'text-amber-600 dark:text-amber-400',
+      bgColor: 'bg-amber-500/10',
+      borderColor: 'border-amber-500/20',
+      icon: <AlertTriangle className="h-5 w-5" />
+    }
+    return {
+      label: 'Unsuitable for Training',
+      desc: 'Significant quality gaps found. Major cleaning or more data collection is required.',
+      color: 'text-red-600 dark:text-red-400',
+      bgColor: 'bg-red-500/10',
+      borderColor: 'border-red-500/20',
+      icon: <AlertOctagon className="h-5 w-5" />
+    }
+  }
+
+  const readiness = getReadinessStatus(analysis.modelReadinessScore)
+
   return (
     <motion.div
       className="space-y-4 sm:space-y-6"
@@ -102,6 +131,22 @@ ${analysis.columns.map((c) => `- ${c.name}: ${c.dataType}, ${c.missingPercentage
       initial="hidden"
       animate="visible"
     >
+      {/* Training Readiness Hero */}
+      <motion.div 
+        variants={itemVariants}
+        className={`rounded-lg border-2 ${readiness.borderColor} ${readiness.bgColor} p-4 sm:p-6`}
+      >
+        <div className="flex items-center gap-4">
+          <div className={`${readiness.color} p-2 rounded-full bg-background`}>
+            {readiness.icon}
+          </div>
+          <div>
+            <h3 className={`text-lg font-bold ${readiness.color}`}>{readiness.label}</h3>
+            <p className="text-sm text-muted-foreground">{readiness.desc}</p>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Overview Section */}
       <motion.div variants={itemVariants} className="rounded-lg border border-border bg-card p-4 sm:p-6">
         <h3 className="text-base sm:text-lg font-semibold mb-4">Overview</h3>

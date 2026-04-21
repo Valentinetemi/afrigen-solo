@@ -5,23 +5,283 @@ const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY!,
 })
 
-const model = google("gemini-flash-latest")
+const model = google('gemini-2.0-flash')
 
-export async function streamSyntheticDataGeneration(prompt: string) {
-  const systemPrompt = `You are a synthetic data generation expert specializing in African contexts.
-Generate realistic datasets with authentic African names, geographic locations, currencies, and socioeconomic indicators.
-Always ensure data reflects real patterns and distributions from the specified region.
-Use real Nigerian states, Kenyan counties, Ghanaian regions — never placeholder values like City_1 or Patient_A.
-Names must reflect the country culture — Yoruba, Hausa, Igbo, Swahili, Zulu etc.
-Return ONLY valid CSV format data with headers in the first row. No explanations, no markdown, no code blocks.
-Each row should be on a new line with comma-separated values. Properly escape values containing commas with quotes.`
+// ─── African context knowledge base ───────────────────────────────────────────
+
+const AFRICAN_CONTEXT = {
+  nigeria: {
+    states: ['Lagos', 'Kano', 'Rivers', 'Ogun', 'Kaduna', 'Anambra', 'Oyo', 'Delta', 'Borno', 'Enugu'],
+    lgas: {
+      Lagos: ['Ikeja', 'Surulere', 'Alimosho', 'Eti-Osa', 'Kosofe', 'Mushin', 'Agege'],
+      Kano: ['Kano Municipal', 'Fagge', 'Dala', 'Gwale', 'Tarauni', 'Nassarawa'],
+      Rivers: ['Port Harcourt', 'Obio-Akpor', 'Eleme', 'Ikwerre', 'Oyigbo'],
+    },
+    ethnicGroups: ['Yoruba', 'Hausa', 'Igbo', 'Fulani', 'Efik', 'Tiv', 'Ijaw'],
+    currency: 'NGN',
+    phonePrefix: '+234',
+    hospitals: ['LUTH', 'UCH Ibadan', 'AKTH Kano', 'NAUTH Nnewi', 'FMC Abuja', 'UNTH Enugu'],
+  },
+  kenya: {
+    counties: ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Nyeri', 'Machakos'],
+    currency: 'KES',
+    phonePrefix: '+254',
+    ethnicGroups: ['Kikuyu', 'Luo', 'Luhya', 'Kamba', 'Kalenjin', 'Meru', 'Kisii'],
+  },
+  ghana: {
+    regions: ['Greater Accra', 'Ashanti', 'Western', 'Eastern', 'Northern', 'Volta', 'Brong-Ahafo'],
+    currency: 'GHS',
+    phonePrefix: '+233',
+    ethnicGroups: ['Akan', 'Ewe', 'Ga', 'Dagbani', 'Fante'],
+  },
+  southAfrica: {
+    provinces: ['Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape', 'Mpumalanga'],
+    currency: 'ZAR',
+    phonePrefix: '+27',
+    ethnicGroups: ['Zulu', 'Xhosa', 'Sotho', 'Tswana', 'Venda', 'Afrikaans'],
+  },
+}
+
+// ─── Prompt parser ─────────────────────────────────────────────────────────────
+
+interface ParsedPrompt {
+  topic: string
+  rowCount: number
+  country: string
+  region: string
+  columns: string[]
+  domainHints: string[]
+}
+
+function parseUserPrompt(userPrompt: string): ParsedPrompt {
+  const lower = userPrompt.toLowerCase()
+
+  // Extract row count
+  const rowMatch = userPrompt.match(/(\d[\d,]*)\s*(rows?|records?|samples?|entries|data points?)/i)
+  let rowCount = 500 // safe default
+  if (rowMatch) {
+    rowCount = Math.min(parseInt(rowMatch[1].replace(/,/g, '')), 2000) // cap at 2000 for quality
+  }
+
+  // Detect country
+  let country = 'nigeria' // default
+  if (lower.includes('kenya') || lower.includes('nairobi')) country = 'kenya'
+  else if (lower.includes('ghana') || lower.includes('accra')) country = 'ghana'
+  else if (lower.includes('south africa') || lower.includes('johannesburg')) country = 'southAfrica'
+
+  // Extract region mentions
+  let region = ''
+  const nigerianStates = AFRICAN_CONTEXT.nigeria.states
+  for (const state of nigerianStates) {
+    if (lower.includes(state.toLowerCase())) {
+      region = state
+      break
+    }
+  }
+
+  // Extract column hints from prompt
+  const columnKeywords: Record<string, string[]> = {
+    health: ['age', 'gender', 'diagnosis', 'symptoms', 'treatment', 'outcome', 'facility', 'lga', 'date_of_visit'],
+    finance: ['transaction_id', 'sender', 'receiver', 'amount', 'currency', 'channel', 'timestamp', 'status'],
+    agriculture: ['crop_type', 'farm_size_ha', 'state', 'lga', 'rainfall_mm', 'temperature_c', 'yield_kg', 'season'],
+    education: ['student_id', 'school', 'lga', 'state', 'gender', 'age', 'grade', 'subject', 'score', 'year'],
+    transport: ['vehicle_id', 'route', 'state', 'distance_km', 'fare_ngn', 'passenger_count', 'date', 'time'],
+  }
+
+  let domainHints: string[] = []
+  let columns: string[] = []
+
+  for (const [domain, cols] of Object.entries(columnKeywords)) {
+    if (lower.includes(domain) ||
+      (domain === 'health' && (lower.includes('malaria') || lower.includes('patient') || lower.includes('hospital') || lower.includes('disease'))) ||
+      (domain === 'finance' && (lower.includes('mobile money') || lower.includes('transaction') || lower.includes('bank'))) ||
+      (domain === 'agriculture' && (lower.includes('crop') || lower.includes('farm') || lower.includes('yield')))
+    ) {
+      domainHints.push(domain)
+      columns = cols
+      break
+    }
+  }
+
+  // If user mentioned specific columns, extract them
+  const columnMatch = userPrompt.match(/with\s+([^.]+?)(?:\s+data|\s+information|\s+fields|\s+columns|$)/i)
+  if (columnMatch) {
+    const mentioned = columnMatch[1].split(/,|and/).map(s => s.trim().toLowerCase().replace(/\s+/g, '_')).filter(Boolean)
+    if (mentioned.length > 0) columns = [...new Set([...columns, ...mentioned])]
+  }
+
+  return {
+    topic: userPrompt,
+    rowCount,
+    country,
+    region,
+    columns,
+    domainHints,
+  }
+}
+
+// ─── Structured system prompt builder ─────────────────────────────────────────
+
+function buildStructuredSystemPrompt(parsed: ParsedPrompt): string {
+  const ctx = AFRICAN_CONTEXT[parsed.country as keyof typeof AFRICAN_CONTEXT] || AFRICAN_CONTEXT.nigeria
+  const columnList = parsed.columns.length > 0 ? parsed.columns.join(', ') : 'infer appropriate columns from the topic'
+  const regionCtx = parsed.region || (parsed.country === 'nigeria' ? 'Lagos or Kano' : 'the capital region')
+
+  const stateList = 'states' in ctx
+    ? ctx.states.join(', ')
+    : 'counties' in ctx
+      ? (ctx as typeof AFRICAN_CONTEXT.kenya).counties.join(', ')
+      : 'regions' in ctx
+        ? (ctx as typeof AFRICAN_CONTEXT.ghana).regions.join(', ')
+        : (ctx as typeof AFRICAN_CONTEXT.southAfrica).provinces.join(', ')
+
+  return `You are a specialized synthetic dataset generator for African AI research.
+
+## STRICT OUTPUT RULES
+- Return ONLY valid CSV. First row is headers. No explanations, no markdown, no backticks, no commentary.
+- Every row must be complete — no empty fields unless the column is explicitly nullable.
+- Escape commas inside values by wrapping in double quotes.
+- All categorical columns must use EXACTLY the same spelling/casing throughout (e.g. always "Male", never mixing "male", "M", "MALE").
+- Date format: YYYY-MM-DD. Timestamps: YYYY-MM-DD HH:MM:SS.
+- Numbers must be numeric only — no units inside cells (e.g. 42 not "42kg").
+
+## COLUMNS TO GENERATE
+${columnList}
+
+## GEOGRAPHIC GROUNDING (${parsed.country.toUpperCase()})
+- Region focus: ${regionCtx}
+- Use ONLY real place names from: ${stateList}
+- LGA/district names must match their actual parent state/county.
+- Do NOT invent place names or use placeholders like "City_1", "District_A".
+
+## CULTURAL AUTHENTICITY
+- Names must reflect the ethnicity of the region (${ctx.ethnicGroups.join(', ')}).
+- Currency: ${ctx.currency}. Phone prefix: ${ctx.phonePrefix}.
+- Socioeconomic values must reflect realistic African distributions (e.g. mobile money amounts in NGN, not USD).
+
+## DATA QUALITY REQUIREMENTS
+- NO PII patterns: Do not generate real ID numbers, passport numbers, or unique biometric data.
+- NO patient names or individual identifiers if this is health data — use Patient_ID format (e.g. PT-00142).
+- Categorical consistency: pick 4-8 fixed categories per categorical column and reuse them across ALL rows.
+- Realistic distributions: ~60% most common category, ~25% second, rest spread across others.
+- Numeric ranges must be realistic (e.g. adult ages 18-75, not 0-200).
+- Include ~3-5% realistic missing values (empty string) in non-critical columns only.
+
+## ROW COUNT
+Generate exactly ${parsed.rowCount} data rows (not counting the header).`
+}
+
+// ─── Post-processor ────────────────────────────────────────────────────────────
+
+export function postProcessCSV(rawCSV: string): string {
+  const lines = rawCSV
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0)
+    // Remove any markdown artifacts
+    .filter(l => !l.startsWith('```') && !l.startsWith('#') && !l.startsWith('//'))
+
+  if (lines.length < 2) return rawCSV
+
+  const header = lines[0]
+  const headers = parseCSVLine(header)
+  const dataLines = lines.slice(1)
+
+  // Normalize categorical columns
+  const columnCategories: Map<number, Map<string, string>> = new Map()
+
+  // First pass: collect categories per column
+  for (const line of dataLines) {
+    const values = parseCSVLine(line)
+    values.forEach((val, i) => {
+      if (!val || !isNaN(Number(val))) return // skip numeric/empty
+      if (!columnCategories.has(i)) columnCategories.set(i, new Map())
+      const cats = columnCategories.get(i)!
+      const normalized = toTitleCase(val.trim())
+      if (!cats.has(val.toLowerCase())) cats.set(val.toLowerCase(), normalized)
+    })
+  }
+
+  // Second pass: normalize values
+  const cleanedLines = dataLines.map(line => {
+    const values = parseCSVLine(line)
+    // Pad or trim to match header count
+    while (values.length < headers.length) values.push('')
+    const trimmed = values.slice(0, headers.length)
+
+    const normalized = trimmed.map((val, i) => {
+      if (!val) return ''
+      const cats = columnCategories.get(i)
+      if (cats && cats.has(val.toLowerCase())) {
+        return cats.get(val.toLowerCase())!
+      }
+      return val
+    })
+
+    return normalized.map(v => (v.includes(',') ? `"${v}"` : v)).join(',')
+  })
+
+  // Remove duplicate rows
+  const seen = new Set<string>()
+  const deduped = cleanedLines.filter(line => {
+    if (seen.has(line)) return false
+    seen.add(line)
+    return true
+  })
+
+  return [header, ...deduped].join('\n')
+}
+
+function parseCSVLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (char === '"') {
+      inQuotes = !inQuotes
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim())
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  result.push(current.trim())
+  return result
+}
+
+function toTitleCase(str: string): string {
+  return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase())
+}
+
+// ─── Main exports ──────────────────────────────────────────────────────────────
+
+export async function streamSyntheticDataGeneration(userPrompt: string) {
+  const parsed = parseUserPrompt(userPrompt)
+  const systemPrompt = buildStructuredSystemPrompt(parsed)
 
   return streamText({
     model,
     system: systemPrompt,
-    prompt,
-    temperature: 0.7,
+    prompt: `Generate a synthetic CSV dataset for: ${userPrompt}`,
+    temperature: 0.4, // lower = more consistent, less hallucination
   })
+}
+
+export async function generateSyntheticData(userPrompt: string): Promise<string> {
+  const parsed = parseUserPrompt(userPrompt)
+  const systemPrompt = buildStructuredSystemPrompt(parsed)
+
+  const { text } = await generateText({
+    model,
+    system: systemPrompt,
+    prompt: `Generate a synthetic CSV dataset for: ${userPrompt}`,
+    temperature: 0.4,
+  })
+
+  return postProcessCSV(text)
 }
 
 export async function generateAIRecommendation(analysisReport: string): Promise<string> {
@@ -34,7 +294,7 @@ Be specific - don't use generic advice.`
     model,
     system: systemPrompt,
     prompt: `Data Quality Analysis:\n${analysisReport}\n\nProvide a specific recommendation.`,
-    temperature: 0.7,
+    temperature: 0.3,
   })
 
   return text

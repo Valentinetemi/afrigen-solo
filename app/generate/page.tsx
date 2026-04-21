@@ -10,7 +10,7 @@ import { DataTable } from '@/components/DataTable'
 import { ExportToggle } from '@/components/ExportToggle'
 import { Button } from '@/components/ui/button'
 import { csvToJSON } from '@/lib/utils/csv-export'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Upload } from 'lucide-react'
 
 export default function GeneratePage() {
   const [streamContent, setStreamContent] = useState('')
@@ -187,6 +187,15 @@ export default function GeneratePage() {
                           page
                         </li>
                       </ul>
+                      <div className="mt-6 pt-4 border-t border-border">
+                        <p className="text-sm font-medium mb-3">Ready to check training quality?</p>
+                        <Link href="/data-quality">
+                          <Button className="w-full sm:w-auto gap-2">
+                            <Upload className="h-4 w-4" />
+                            Upload & Analyze Quality
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </>
                 )}

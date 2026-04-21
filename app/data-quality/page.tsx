@@ -8,6 +8,7 @@ import { FileUpload } from '@/components/FileUpload'
 import { QualityAnalysisResults } from '@/components/QualityAnalysisResults'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { CheckCircle2 } from 'lucide-react'
 import { QualityAnalysisResult } from '@/lib/services/data-quality'
 import { arrayToJSON, downloadFile } from '@/lib/utils/csv-export'
 
@@ -122,8 +123,20 @@ export default function DataQualityPage() {
         >
           {/* Info Section */}
           <motion.div variants={itemVariants} className="rounded-lg border border-border bg-card p-4 sm:p-6">
-            <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">Data Quality Analyzer</h2>
-            <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-base sm:text-lg font-semibold mb-1">Data Quality & Training Readiness</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Validate your datasets before model development.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary">
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="text-xs font-medium">Training Ready Analysis</span>
+              </div>
+            </div>
+            
+            <p className="text-xs sm:text-sm text-muted-foreground mb-4 leading-relaxed">
               Upload your dataset to analyze data quality, identify gaps, and get a model readiness
               score. Perfect for data scientists and ML engineers validating datasets before
               training.

@@ -36,7 +36,7 @@ export default function CatalogPage() {
         const data = await res.json()
         setDatasets(data.datasets)
       } catch (err) {
-        console.error('[v0] Catalog fetch error:', err)
+        console.error('Catalog fetch error:', err)
         setError('Failed to load datasets')
       } finally {
         setLoading(false)
@@ -52,7 +52,7 @@ export default function CatalogPage() {
 
     const promptData = datasetPrompts[id]
     if (!promptData) {
-      console.error('[v0] No prompt found for dataset:', id)
+      console.error('No prompt found for dataset:', id)
       return
     }
 
@@ -92,8 +92,8 @@ export default function CatalogPage() {
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
     } catch (err) {
-      console.error('[v0] Download error:', err)
-      // Silently fail - no alert
+      console.error('Download error:', err)
+      // Silently fail
     } finally {
       setDownloadingId(null)
     }

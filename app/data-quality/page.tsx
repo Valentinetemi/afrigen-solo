@@ -38,7 +38,7 @@ export default function DataQualityPage() {
       const data = await response.json()
       setAnalysis(data.analysis)
     } catch (err) {
-      console.error('[v0] Analysis error:', err)
+      console.error('Analysis error:', err)
       setError((err as Error).message || 'Failed to analyze file')
     } finally {
       setLoading(false)

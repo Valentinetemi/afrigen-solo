@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
     return Response.json({ analysis })
   } catch (error) {
-    console.error('[v0] Analyze error:', error)
+    console.error('Analyze error:', error)
     return Response.json(
       {
         error: 'Failed to analyze file',

@@ -12,7 +12,7 @@ export async function POST(req: Request) {
 
     return Response.json({ recommendation })
   } catch (error) {
-    console.error('[v0] Recommendation error:', error)
+    console.error('Recommendation error:', error)
     return Response.json(
       {
         error: 'Failed to generate recommendation',

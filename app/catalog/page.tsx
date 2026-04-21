@@ -1,138 +1,225 @@
-"use client";
-import { motion } from "framer-motion";
-import Navbar from "../components/Navbar";
+'use client'
 
-const SAMPLE_DATASETS = [
-  { id: 1, name: "Malaria Patient Records — Kano State", domain: "healthcare", country: "Nigeria", flag: "🇳🇬", rows: 50000, format: "CSV", created: "2 hours ago", tags: ["malaria", "patient-records", "public-health"] },
-  { id: 2, name: "M-Pesa Transaction Data — Nairobi", domain: "finance", country: "Kenya", flag: "🇰🇪", rows: 100000, format: "JSON", created: "5 hours ago", tags: ["mobile-money", "transactions", "fintech"] },
-  { id: 3, name: "Maize Yield Records — Zambia 2024", domain: "agriculture", country: "Zambia", flag: "🇿🇲", rows: 10000, format: "CSV", created: "1 day ago", tags: ["maize", "crop-yield", "farming"] },
-  { id: 4, name: "Diabetes Patient Data — Accra", domain: "healthcare", country: "Ghana", flag: "🇬🇭", rows: 25000, format: "CSV", created: "1 day ago", tags: ["diabetes", "chronic-disease", "hospital"] },
-  { id: 5, name: "Mobile Money Fraud Cases — Lagos", domain: "finance", country: "Nigeria", flag: "🇳🇬", rows: 15000, format: "JSONL", created: "2 days ago", tags: ["fraud", "mobile-banking", "security"] },
-  { id: 6, name: "Coffee Farm Data — Ethiopia", domain: "agriculture", country: "Ethiopia", flag: "🇪🇹", rows: 8000, format: "CSV", created: "2 days ago", tags: ["coffee", "export", "smallholder-farms"] },
-  { id: 7, name: "HIV/AIDS Patient Records — Johannesburg", domain: "healthcare", country: "South Africa", flag: "🇿🇦", rows: 30000, format: "CSV", created: "3 days ago", tags: ["HIV", "AIDS", "ARV-treatment"] },
-  { id: 8, name: "Airtime Transfer Records — West Africa", domain: "finance", country: "Ghana", flag: "🇬🇭", rows: 75000, format: "JSON", created: "3 days ago", tags: ["airtime", "telecom", "payments"] },
-];
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { motion } from 'framer-motion'
+import { Navbar } from '@/components/Navbar'
+import { DatasetCard } from '@/components/DatasetCard'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { datasetPrompts } from '@/lib/utils/dataset-prompts'
 
-const DOMAIN_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  healthcare: { bg: "#fee2e2", text: "#ef4444", border: "#fca5a5" },
-  finance: { bg: "#fef3c7", text: "#d97706", border: "#fcd34d" },
-  agriculture: { bg: "#dcfce7", text: "#16a34a", border: "#86efac" },
-};
+interface Dataset {
+  id: string
+  name: string
+  description: string
+  domain: string
+  country: string
+  rowCount: number
+  columnCount: number
+  fidelityScore: number
+  createdAt: string
+}
 
 export default function CatalogPage() {
+  const [datasets, setDatasets] = useState<Dataset[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchCatalog() {
+      try {
+        const res = await fetch('/api/catalog')
+        if (!res.ok) throw new Error('Failed to fetch catalog')
+
+        const data = await res.json()
+        setDatasets(data.datasets)
+      } catch (err) {
+        console.error('[v0] Catalog fetch error:', err)
+        setError('Failed to load datasets')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCatalog()
+  }, [])
+
+  const handleDownload = async (id: string) => {
+    const dataset = datasets.find((d) => d.id === id)
+    if (!dataset) return
+
+    const promptData = datasetPrompts[id]
+    if (!promptData) {
+      console.error('[v0] No prompt found for dataset:', id)
+      return
+    }
+
+    setDownloadingId(id)
+
+    try {
+      // Call the generate API with the dataset-specific prompt
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: promptData.prompt }),
+      })
+
+      if (!response.body) {
+        throw new Error('No response body')
+      }
+
+      // Read the streaming response
+      let csvContent = ''
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        csvContent += decoder.decode(value, { stream: true })
+      }
+
+      // Trigger file download
+      const blob = new Blob([csvContent], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = promptData.filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('[v0] Download error:', err)
+      // Silently fail - no alert
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08,
+        delayChildren: 0.2,
+      },
+    },
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4, ease: 'easeOut' },
+    },
+  }
+
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+    <div className="min-h-screen bg-background">
       <Navbar />
 
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 24px" }}>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>
-            Dataset Catalog
-          </h1>
-          <p style={{ fontSize: 15, color: "var(--text-muted)", marginBottom: 32 }}>
-            Browse synthetic datasets generated by the AfriGen community
-          </p>
-        </motion.div>
-
-        {/* Filter bar */}
+      <main className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          style={{
-            display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap",
-          }}
+          className="space-y-4 sm:space-y-8"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
         >
-          {["All", "Healthcare", "Finance", "Agriculture"].map(f => (
-            <button key={f} style={{
-              padding: "6px 16px", borderRadius: 20, fontSize: 13, fontWeight: 500,
-              border: "1px solid var(--border)",
-              background: f === "All" ? "var(--accent)" : "var(--bg)",
-              color: f === "All" ? "white" : "var(--text-muted)",
-              cursor: "pointer",
-            }}>
-              {f}
-            </button>
-          ))}
-          <div style={{ marginLeft: "auto" }}>
-            <input
-              placeholder="Search datasets..."
-              style={{
-                padding: "6px 14px", borderRadius: 20,
-                border: "1px solid var(--border)", fontSize: 13,
-                outline: "none", width: 220, fontFamily: "var(--sans)",
-                color: "var(--text)", background: "var(--bg)",
-              }}
-            />
-          </div>
-        </motion.div>
+          {/* Hero Section */}
+          <motion.div variants={itemVariants} className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold">African Data Infrastructure</h1>
+            <p className="text-sm sm:text-base lg:text-lg text-muted-foreground max-w-2xl">
+              Browse and download pre-generated synthetic African datasets. All datasets include realistic country-specific data, demographics, and metrics.
+            </p>
+          </motion.div>
 
-        {/* Dataset grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>
-          {SAMPLE_DATASETS.map((dataset, i) => {
-            const colors = DOMAIN_COLORS[dataset.domain];
-            return (
+          {/* Datasets Grid */}
+          <motion.div variants={itemVariants}>
+            <h3 className="text-xs sm:text-sm font-medium mb-3 sm:mb-4 text-muted-foreground uppercase tracking-wider">
+              Available Datasets ({datasets.length})
+            </h3>
+
+            {loading ? (
+              <div className="grid gap-3 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="space-y-3">
+                    <Skeleton className="h-32 rounded-lg" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : error ? (
+              <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/50 p-4 text-center">
+                <p className="text-sm text-red-900 dark:text-red-100">{error}</p>
+              </div>
+            ) : datasets.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-card/50 p-12 text-center">
+                <p className="text-muted-foreground">
+                  No datasets available yet. Generate one on the Generate page.
+                </p>
+              </div>
+            ) : (
               <motion.div
-                key={dataset.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                whileHover={{ y: -2, boxShadow: "var(--shadow-md)" }}
-                style={{
-                  background: "var(--bg)", border: "1px solid var(--border)",
-                  borderRadius: "var(--radius-lg)", padding: 20,
-                  cursor: "pointer", transition: "all 0.2s",
-                  boxShadow: "var(--shadow-sm)",
-                }}
+                className="grid gap-3 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
               >
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
-                  <span style={{
-                    fontSize: 11, fontWeight: 600,
-                    color: colors.text, background: colors.bg,
-                    border: `1px solid ${colors.border}`,
-                    padding: "2px 8px", borderRadius: 20,
-                    textTransform: "uppercase", letterSpacing: "0.05em",
-                  }}>
-                    {dataset.domain}
-                  </span>
-                  <span style={{ fontSize: 13 }}>{dataset.flag}</span>
-                </div>
-
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4, lineHeight: 1.4 }}>
-                  {dataset.name}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 14 }}>
-                  {dataset.country} · {dataset.rows.toLocaleString()} rows · {dataset.format}
-                </div>
-
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 14 }}>
-                  {dataset.tags.map(tag => (
-                    <span key={tag} style={{
-                      fontSize: 11, color: "var(--text-dim)",
-                      background: "var(--bg-tertiary)",
-                      border: "1px solid var(--border)",
-                      padding: "2px 8px", borderRadius: 4,
-                    }}>
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{dataset.created}</span>
-                  <button style={{
-                    fontSize: 12, fontWeight: 500, color: "var(--accent2)",
-                    background: "var(--accent2-light)", border: "none",
-                    padding: "4px 12px", borderRadius: 6, cursor: "pointer",
-                  }}>
-                    Preview →
-                  </button>
-                </div>
+                {datasets.map((dataset, idx) => (
+                  <DatasetCard
+                    key={dataset.id}
+                    {...dataset}
+                    isNew={idx >= datasets.length - 1}
+                    isDownloading={downloadingId === dataset.id}
+                    onDownload={handleDownload}
+                  />
+                ))}
               </motion.div>
-            );
-          })}
-        </div>
-      </div>
+            )}
+          </motion.div>
+
+          {/* Info Section */}
+          <motion.div variants={itemVariants} className="rounded-lg border border-border bg-card p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold mb-3">About These Datasets</h3>
+            <ul className="space-y-2 text-xs sm:text-sm text-muted-foreground">
+              <li className="flex gap-2">
+                <span className="text-primary">→</span>
+                <span>
+                  <strong>Authentic:</strong> Generated with real African place names,
+                  demographics, and domain-specific metrics
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-primary">→</span>
+                <span>
+                  <strong>Domain-Specific:</strong> Healthcare, FinTech, Agriculture,
+                  Education, Energy, and Labor datasets
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-primary">→</span>
+                <span>
+                  <strong>Validated:</strong> Use our Data Quality analyzer to check
+                  completeness and model readiness
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-primary">→</span>
+                <span>
+                  <strong>Ready to Use:</strong> Download as CSV or JSON and use
+                  immediately for training
+                </span>
+              </li>
+            </ul>
+          </motion.div>
+        </motion.div>
+      </main>
     </div>
-  );
+  )
 }

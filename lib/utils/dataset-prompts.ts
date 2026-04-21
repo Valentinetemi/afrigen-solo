@@ -1,4 +1,4 @@
-// Pre-written prompts for each hardcoded catalog dataset
+// This are pre-written prompts for each hardcoded catalog dataset
 export const datasetPrompts: Record<string, { prompt: string; filename: string }> = {
   'malaria-nigeria': {
     prompt:

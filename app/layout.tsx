@@ -9,7 +9,6 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'AfriGen - Synthetic Data for African Data Scientists',
   description: 'Generate authentic synthetic datasets for African contexts. Validate data quality and model readiness.',
-  generator: 'v0.app',
   icons: {
     icon: [
       {

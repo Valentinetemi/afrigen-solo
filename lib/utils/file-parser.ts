@@ -23,9 +23,10 @@ export async function parseFile(file: File): Promise<ParsedData> {
   throw new Error(`Unsupported file format: ${extension}`)
 }
 
-function parseCSV(file: File): Promise<ParsedData> {
+async function parseCSV(file: File): Promise<ParsedData> {
+  const content = await file.text()
   return new Promise((resolve, reject) => {
-    Papa.parse(file, {
+    Papa.parse(content, {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
@@ -50,70 +51,55 @@ function parseCSV(file: File): Promise<ParsedData> {
   })
 }
 
-function parseJSON(file: File): Promise<ParsedData> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string
-        const data = JSON.parse(content)
+async function parseJSON(file: File): Promise<ParsedData> {
+  try {
+    const content = await file.text()
+    const data = JSON.parse(content)
 
-        if (!Array.isArray(data)) {
-          reject(new Error('JSON must be an array of objects'))
-          return
-        }
-
-        if (data.length === 0) {
-          reject(new Error('JSON array is empty'))
-          return
-        }
-
-        const headers = Object.keys(data[0])
-        const domain = detectDomain(headers)
-
-        resolve({
-          rows: data,
-          headers,
-          detectedDomain: domain,
-        })
-      } catch (error) {
-        reject(new Error(`Failed to parse JSON: ${(error as Error).message}`))
-      }
+    if (!Array.isArray(data)) {
+      throw new Error('JSON must be an array of objects')
     }
-    reader.readAsText(file)
-  })
+
+    if (data.length === 0) {
+      throw new Error('JSON array is empty')
+    }
+
+    const headers = Object.keys(data[0])
+    const domain = detectDomain(headers)
+
+    return {
+      rows: data,
+      headers,
+      detectedDomain: domain,
+    }
+  } catch (error) {
+    throw new Error(`Failed to parse JSON: ${(error as Error).message}`)
+  }
 }
 
-function parseExcel(file: File): Promise<ParsedData> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const data = e.target?.result as ArrayBuffer
-        const workbook = XLSX.read(new Uint8Array(data), { type: 'array' })
-        const sheetName = workbook.SheetNames[0]
-        const worksheet = workbook.Sheets[sheetName]
-        const rows = XLSX.utils.sheet_to_json(worksheet) as any[]
+async function parseExcel(file: File): Promise<ParsedData> {
+  try {
+    const buffer = await file.arrayBuffer()
+    const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' })
+    const sheetName = workbook.SheetNames[0]
+    const worksheet = workbook.Sheets[sheetName]
+    const rows = XLSX.utils.sheet_to_json(worksheet) as any[]
 
-        if (rows.length === 0) {
-          reject(new Error('Excel file is empty'))
-          return
-        }
-
-        const headers = Object.keys(rows[0])
-        const domain = detectDomain(headers)
-
-        resolve({
-          rows,
-          headers,
-          detectedDomain: domain,
-        })
-      } catch (error) {
-        reject(new Error(`Failed to parse Excel: ${(error as Error).message}`))
-      }
+    if (rows.length === 0) {
+      throw new Error('Excel file is empty')
     }
-    reader.readAsArrayBuffer(file)
-  })
+
+    const headers = Object.keys(rows[0])
+    const domain = detectDomain(headers)
+
+    return {
+      rows,
+      headers,
+      detectedDomain: domain,
+    }
+  } catch (error) {
+    throw new Error(`Failed to parse Excel: ${(error as Error).message}`)
+  }
 }
 
 async function parseParquet(file: File): Promise<ParsedData> {

@@ -157,7 +157,7 @@ export default function GeneratePage() {
                   Generate African Datasets
                 </h1>
                 <p className="text-sm text-gray-400 mt-2 max-w-md mx-auto leading-relaxed">
-                  Describe what you need. Get clean, culturally grounded synthetic data — ready for model training.
+                  Describe what you need. Get clean, culturally grounded synthetic data ready for model training.
                 </p>
               </div>
 
@@ -169,7 +169,7 @@ export default function GeneratePage() {
                   <div className="mt-6 pt-5 border-t border-gray-100 flex items-start gap-2.5">
                     <Sparkles className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
                     <p className="text-[11px] text-gray-400 leading-relaxed">
-                      <span className="font-semibold text-gray-500">Pro tip:</span> Specify real African states, counties, or LGAs — not just country names — for the most authentic data distributions.
+                      <span className="font-semibold text-gray-500">Pro tip:</span> Specify real African states, counties, or LGAs, not just country names for the most authentic data distributions.
                     </p>
                   </div>
                 </div>

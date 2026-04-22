@@ -7,7 +7,7 @@ const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY!,
 })
 
-const model = google('gemini-2.0-flash')
+const model = google('gemini-flash-latest')
 
 // ─── African context knowledge base ───────────────────────────────────────────
 
@@ -150,6 +150,8 @@ ${referenceData}
 Distributions in your generated data MUST align with these figures.
 
 ` : ''}## DATA QUALITY REQUIREMENTS
+- Never generate PII columns like patient_name, phone_number, national_id, email, or any personally identifiable information
+- Use anonymous identifiers like patient_id (numeric only), case_id, record_id instead
 - NO PII: Do not generate real ID numbers, passport numbers, or biometric data.
 - NO patient names — use Patient_ID format (e.g. PT-00142).
 - Categorical consistency: pick 4–8 fixed categories per column and reuse across ALL rows.

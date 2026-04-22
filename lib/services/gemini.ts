@@ -1,7 +1,7 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { generateText, streamText } from 'ai'
 import { fetchReferenceData } from './reference-data'
-import { extractDomain, extractCountry } from '../utils/extract'
+import { extractDomain, extractCountry } from '@/lib/utils/extract'
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY!,

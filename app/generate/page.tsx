@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Navbar } from '@/components/Navbar'
 import { GenerateInput } from '@/components/GenerateInput'
@@ -11,188 +10,42 @@ import { DataTable } from '@/components/DataTable'
 import { ExportToggle } from '@/components/ExportToggle'
 import { Button } from '@/components/ui/button'
 import { csvToJSON } from '@/lib/utils/csv-export'
-import { ChevronRight, Upload, Sparkles, Database, Globe, Zap, CheckCircle } from 'lucide-react'
+import { ChevronRight, Upload, CheckCircle, Sparkles } from 'lucide-react'
 
-// ── Idle right-panel: animated stats + floating preview rows ──────────────────
-
-const PREVIEW_ROWS = [
-  { id: 'PT-00421', state: 'Lagos', diagnosis: 'Malaria', outcome: 'Recovered' },
-  { id: 'TXN-09831', lga: 'Ikeja', amount: '₦12,500', channel: 'USSD' },
-  { id: 'FM-00112', crop: 'Maize', yield: '3.2 t/ha', season: 'Wet' },
-  { id: 'ST-00553', school: 'FGC Abuja', score: '87/100', grade: 'A' },
-  { id: 'PT-00784', state: 'Kano', diagnosis: 'Typhoid', outcome: 'Discharged' },
-  { id: 'TXN-04421', lga: 'Surulere', amount: '₦4,200', channel: 'App' },
-]
-
-const STATS = [
-  { label: 'Datasets Generated', value: '12,847', icon: Database, color: 'text-green-600', bg: 'bg-green-50' },
-  { label: 'African Countries', value: '18', icon: Globe, color: 'text-blue-600', bg: 'bg-blue-50' },
-  { label: 'Avg Generation Time', value: '8s', icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50' },
-  { label: 'Model Ready Datasets', value: '9,203', icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-]
-
-const DOMAIN_TAGS = ['🏥 Health', '💳 Finance', '🌾 Agriculture', '📚 Education', '🚌 Transport', '⚡ Energy', '🏗️ Infrastructure', '📡 Telecom']
-
-function FloatingRow({ row, delay }: { row: typeof PREVIEW_ROWS[0]; delay: number }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay, duration: 0.5, ease: 'easeOut' }}
-      className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white border border-gray-100 shadow-sm text-xs font-mono"
-    >
-      <span className="text-green-600 font-semibold shrink-0">{Object.values(row)[0]}</span>
-      <div className="flex gap-2 flex-wrap">
-        {Object.entries(row).slice(1).map(([k, v]) => (
-          <span key={k} className="text-gray-400">
-            <span className="text-gray-300">{k}: </span>{v}
-          </span>
-        ))}
-      </div>
-    </motion.div>
-  )
-}
-
-function IdlePanel() {
-  const [tick, setTick] = useState(0)
-  const [visibleRows, setVisibleRows] = useState<number[]>([])
-
-  // Cycle rows in/out
-  useEffect(() => {
-    setVisibleRows([0, 1, 2])
-    const interval = setInterval(() => {
-      setTick(t => t + 1)
-    }, 2800)
-    return () => clearInterval(interval)
-  }, [])
-
-  useEffect(() => {
-    const base = tick % PREVIEW_ROWS.length
-    setVisibleRows([base, (base + 1) % PREVIEW_ROWS.length, (base + 2) % PREVIEW_ROWS.length])
-  }, [tick])
-
-  return (
-    <div className="flex flex-col h-full gap-6 justify-center px-2">
-
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center"
-      >
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-green-50 border border-green-100 mb-4">
-          <motion.div
-            className="w-2 h-2 rounded-full bg-green-500"
-            animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
-          <span className="text-xs font-semibold text-green-700">Ready to generate</span>
-        </div>
-        <h3 className="text-lg font-bold text-gray-800">Your data will appear here</h3>
-        <p className="text-sm text-gray-400 mt-1">Real-time streaming, row by row</p>
-      </motion.div>
-
-      {/* Live preview rows */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Sample African Data</span>
-          <motion.span
-            animate={{ opacity: [1, 0.4, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="text-[10px] text-green-500 font-mono"
-          >
-            ● live preview
-          </motion.span>
-        </div>
-        <AnimatePresence mode="popLayout">
-          {visibleRows.map((rowIdx) => (
-            <motion.div
-              key={`${tick}-${rowIdx}`}
-              initial={{ opacity: 0, y: 10, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.98 }}
-              transition={{ duration: 0.4, ease: 'easeOut' }}
-            >
-              <FloatingRow row={PREVIEW_ROWS[rowIdx]} delay={0} />
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-3">
-        {STATS.map((s, i) => (
-          <motion.div
-            key={s.label}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 + i * 0.08 }}
-            className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 shadow-sm"
-          >
-            <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center shrink-0`}>
-              <s.icon className={`w-4 h-4 ${s.color}`} />
-            </div>
-            <div>
-              <p className="text-base font-bold text-gray-800 leading-none">{s.value}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{s.label}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Scrolling domain tags */}
-      <div className="overflow-hidden relative">
-        <div className="flex gap-2 flex-wrap">
-          {DOMAIN_TAGS.map((tag, i) => (
-            <motion.span
-              key={tag}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.5 + i * 0.06 }}
-              className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-[11px] font-medium border border-gray-200"
-            >
-              {tag}
-            </motion.span>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Streaming progress bar ────────────────────────────────────────────────────
-
+// ── Live row counter bar ───────────────────────────────────────────────────────
 function StreamingHeader({ rowCount, isStreaming }: { rowCount: number; isStreaming: boolean }) {
   return (
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <motion.div
-            className="w-2.5 h-2.5 rounded-full bg-green-500"
-            animate={isStreaming ? { scale: [1, 1.4, 1], opacity: [1, 0.5, 1] } : { scale: 1, opacity: 1 }}
-            transition={{ duration: 1, repeat: isStreaming ? Infinity : 0 }}
-          />
-          <span className="text-sm font-semibold text-gray-800">
-            {isStreaming ? 'Generating…' : 'Complete'}
-          </span>
-        </div>
-        {rowCount > 0 && (
-          <motion.span
-            key={rowCount}
-            initial={{ scale: 1.2, color: '#16a34a' }}
-            animate={{ scale: 1, color: '#6b7280' }}
-            className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded-full"
-          >
-            {rowCount} rows
-          </motion.span>
-        )}
+        <motion.div
+          className="w-2.5 h-2.5 rounded-full bg-green-500"
+          animate={isStreaming
+            ? { scale: [1, 1.4, 1], opacity: [1, 0.4, 1] }
+            : { scale: 1, opacity: 1 }}
+          transition={{ duration: 1, repeat: isStreaming ? Infinity : 0 }}
+        />
+        <span className="text-sm font-semibold text-gray-800">
+          {isStreaming ? 'Generating…' : 'Complete'}
+        </span>
+        <AnimatePresence>
+          {rowCount > 0 && (
+            <motion.span
+              key={rowCount}
+              initial={{ opacity: 0, scale: 1.2 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-xs font-mono bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full"
+            >
+              {rowCount} rows
+            </motion.span>
+          )}
+        </AnimatePresence>
       </div>
       {isStreaming && (
-        <div className="w-32 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+        <div className="w-28 h-1.5 rounded-full bg-gray-100 overflow-hidden">
           <motion.div
             className="h-full bg-green-500 rounded-full"
             animate={{ x: ['-100%', '200%'] }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
             style={{ width: '50%' }}
           />
         </div>
@@ -202,63 +55,14 @@ function StreamingHeader({ rowCount, isStreaming }: { rowCount: number; isStream
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-
 export default function GeneratePage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#f8f9fa]">
-        <Navbar />
-        <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-8 sm:py-10 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
-        </main>
-      </div>
-    }>
-      <GeneratePageContent />
-    </Suspense>
-  )
-}
-
-function GeneratePageContent() {
-  const searchParams = useSearchParams()
-  const initialPrompt = searchParams.get('prompt') || ''
-
   const [streamContent, setStreamContent] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [generatedData, setGeneratedData] = useState<any[]>([])
   const [headers, setHeaders] = useState<string[]>([])
   const [hasCompleted, setHasCompleted] = useState(false)
   const [rowCount, setRowCount] = useState(0)
-
-  // Load state from localStorage on mount
-  useEffect(() => {
-    const savedStream = localStorage.getItem('generate_stream_content')
-    const savedData = localStorage.getItem('generate_data')
-    const savedHeaders = localStorage.getItem('generate_headers')
-    const savedCompleted = localStorage.getItem('generate_has_completed')
-    const savedRowCount = localStorage.getItem('generate_row_count')
-
-    if (savedStream) setStreamContent(savedStream)
-    if (savedData) setGeneratedData(JSON.parse(savedData))
-    if (savedHeaders) setHeaders(JSON.parse(savedHeaders))
-    if (savedCompleted === 'true') setHasCompleted(true)
-    if (savedRowCount) setRowCount(parseInt(savedRowCount))
-  }, [])
-
-  // Save state to localStorage
-  useEffect(() => {
-    localStorage.setItem('generate_stream_content', streamContent)
-    localStorage.setItem('generate_data', JSON.stringify(generatedData))
-    localStorage.setItem('generate_headers', JSON.stringify(headers))
-    localStorage.setItem('generate_has_completed', String(hasCompleted))
-    localStorage.setItem('generate_row_count', String(rowCount))
-  }, [streamContent, generatedData, headers, hasCompleted, rowCount])
-
-  // Handle initial prompt from URL
-  useEffect(() => {
-    if (initialPrompt && !isStreaming && generatedData.length === 0) {
-      handleGenerate(initialPrompt)
-    }
-  }, [initialPrompt])
+  const hasStarted = isStreaming || streamContent.length > 0
 
   const handleGenerate = async (prompt: string) => {
     setStreamContent('')
@@ -267,9 +71,6 @@ function GeneratePageContent() {
     setHasCompleted(false)
     setIsStreaming(true)
     setRowCount(0)
-    
-    // Clear prompt in storage to avoid loop if we add logic for it
-    localStorage.removeItem('generate_current_prompt')
 
     try {
       const response = await fetch('/api/generate', {
@@ -277,7 +78,6 @@ function GeneratePageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
       })
-
       if (!response.ok) throw new Error('Generation failed')
 
       const reader = response.body?.getReader()
@@ -290,22 +90,16 @@ function GeneratePageContent() {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-
         const chunk = decoder.decode(value, { stream: true })
         buffer += chunk
         setStreamContent(prev => prev + chunk)
-
-        // Count rows live
         const newLines = chunk.split('\n').filter(l => l.trim()).length
         lineCount += newLines
-        setRowCount(Math.max(0, lineCount - 1)) // subtract header
+        setRowCount(Math.max(0, lineCount - 1))
       }
 
       const finalChunk = decoder.decode()
-      if (finalChunk) {
-        buffer += finalChunk
-        setStreamContent(prev => prev + finalChunk)
-      }
+      if (finalChunk) { buffer += finalChunk; setStreamContent(prev => prev + finalChunk) }
 
       const jsonData = csvToJSON(buffer)
       const parsedHeaders = jsonData.length > 0 ? Object.keys(jsonData[0]) : []
@@ -315,21 +109,17 @@ function GeneratePageContent() {
 
       if (jsonData.length > 0) {
         try {
-          const domain = extractDomain(prompt)
-          const country = extractCountry(prompt)
           await fetch('/api/catalog', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               csvData: buffer,
-              name: `Generated: ${domain} - ${country}`,
-              domain,
-              country,
+              name: `Generated: ${extractDomain(prompt)} - ${extractCountry(prompt)}`,
+              domain: extractDomain(prompt),
+              country: extractCountry(prompt),
             }),
           })
-        } catch (err) {
-          console.error('Failed to add to catalog:', err)
-        }
+        } catch (err) { console.error('Catalog error:', err) }
       }
     } catch (error) {
       console.error('Generation error:', error)
@@ -340,175 +130,189 @@ function GeneratePageContent() {
     }
   }
 
-  const handleStreamComplete = () => setHasCompleted(true)
-
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
       <Navbar />
 
-      <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-8 sm:py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[calc(100vh-120px)]">
+      <main className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-8 sm:py-12">
+        <AnimatePresence mode="wait">
 
-          {/* ── LEFT: Input panel ── */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4, ease: 'easeOut' }}
-            className="flex flex-col"
-          >
-            <div className="sticky top-6 rounded-2xl border border-gray-200 bg-white shadow-sm p-6 sm:p-8">
-              <GenerateInput onSubmit={handleGenerate} isLoading={isStreaming} initialPrompt={initialPrompt} />
+          {/* ── IDLE: single centered column ── */}
+          {!hasStarted && (
+            <motion.div
+              key="idle"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.35 }}
+              className="flex flex-col items-center"
+            >
+              {/* Page title */}
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-50 border border-green-100 mb-4">
+                  <Sparkles className="w-3.5 h-3.5 text-green-600" />
+                  <span className="text-xs font-semibold text-green-700">AI-Powered Synthetic Data</span>
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">
+                  Generate African Datasets
+                </h1>
+                <p className="text-sm text-gray-400 mt-2 max-w-md mx-auto leading-relaxed">
+                  Describe what you need. Get clean, culturally grounded synthetic data — ready for model training.
+                </p>
+              </div>
 
-              {/* Pro tip */}
-              <div className="mt-6 pt-5 border-t border-gray-100">
-                <div className="flex items-start gap-2.5">
-                  <Sparkles className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
-                  <p className="text-[11px] text-gray-400 leading-relaxed">
-                    <span className="font-semibold text-gray-500">Pro tip:</span> Specify African countries, real place names, authentic demographics, and domain-specific indicators for best results.
-                  </p>
+              {/* Form card */}
+              <div className="w-full max-w-2xl">
+                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-6 sm:p-8">
+                  <GenerateInput onSubmit={handleGenerate} isLoading={isStreaming} />
+
+                  <div className="mt-6 pt-5 border-t border-gray-100 flex items-start gap-2.5">
+                    <Sparkles className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
+                    <p className="text-[11px] text-gray-400 leading-relaxed">
+                      <span className="font-semibold text-gray-500">Pro tip:</span> Specify real African states, counties, or LGAs — not just country names — for the most authentic data distributions.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Feature hints */}
+                <div className="grid grid-cols-3 gap-3 mt-4">
+                  {[
+                    { emoji: '🌍', label: '18 African countries' },
+                    { emoji: '⚡', label: 'Real-time streaming' },
+                    { emoji: '🔬', label: 'Quality scored' },
+                  ].map(f => (
+                    <div key={f.label} className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-gray-200 py-3 px-2 text-center">
+                      <span className="text-lg">{f.emoji}</span>
+                      <span className="text-[11px] text-gray-500 font-medium leading-tight">{f.label}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          )}
 
-          {/* ── RIGHT: Output panel ── */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4, ease: 'easeOut', delay: 0.1 }}
-            className="flex flex-col"
-          >
-            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm flex-1 overflow-hidden">
+          {/* ── ACTIVE: 50/50 split ── */}
+          {hasStarted && (
+            <motion.div
+              key="split"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start"
+            >
+              {/* Left: input (sticky) */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+              >
+                <div className="sticky top-6 rounded-2xl border border-gray-200 bg-white shadow-sm p-6 sm:p-8">
+                  <GenerateInput onSubmit={handleGenerate} isLoading={isStreaming} />
+                  <div className="mt-5 pt-4 border-t border-gray-100 flex items-start gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
+                    <p className="text-[11px] text-gray-400 leading-relaxed">
+                      <span className="font-semibold text-gray-500">Pro tip:</span> You can regenerate with a refined prompt while reviewing the output on the right.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
 
-              <AnimatePresence mode="wait">
+              {/* Right: live output */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, ease: 'easeOut', delay: 0.08 }}
+                className="flex flex-col gap-5"
+              >
+                {/* Terminal card */}
+                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-6">
+                  <StreamingHeader rowCount={rowCount} isStreaming={isStreaming} />
+                  <StreamingTerminal
+                    content={streamContent}
+                    isStreaming={isStreaming}
+                    onComplete={() => setHasCompleted(true)}
+                  />
+                </div>
 
-                {/* Idle state */}
-                {!streamContent && !isStreaming && (
-                  <motion.div
-                    key="idle"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.3 }}
-                    className="h-full min-h-[600px] p-6 sm:p-8"
-                  >
-                    <IdlePanel />
-                  </motion.div>
-                )}
+                {/* Post-completion */}
+                <AnimatePresence>
+                  {hasCompleted && generatedData.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4 }}
+                      className="flex flex-col gap-5"
+                    >
+                      <ExportToggle data={generatedData} headers={headers} />
+                      <DataTable data={generatedData} headers={headers} />
 
-                {/* Streaming + completed state */}
-                {(streamContent || isStreaming) && (
-                  <motion.div
-                    key="streaming"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="p-6 sm:p-8 flex flex-col gap-6"
-                  >
-                    {/* Streaming header with live row count */}
-                    <StreamingHeader rowCount={rowCount} isStreaming={isStreaming} />
-
-                    {/* Terminal */}
-                    <StreamingTerminal
-                      content={streamContent}
-                      isStreaming={isStreaming}
-                      onComplete={handleStreamComplete}
-                    />
-
-                    {/* Post-completion */}
-                    <AnimatePresence>
-                      {hasCompleted && generatedData.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 16 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.4, ease: 'easeOut' }}
-                          className="flex flex-col gap-5"
-                        >
-                          <ExportToggle data={generatedData} headers={headers} />
-                          <DataTable data={generatedData} headers={headers} />
-
-                          {/* Next steps card */}
-                          <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-                            <div className="flex items-center gap-2 mb-4">
-                              <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
-                                <CheckCircle className="w-3 h-3 text-green-600" />
-                              </div>
-                              <h3 className="text-sm font-semibold text-gray-800">Dataset ready</h3>
-                            </div>
-
-                            <ul className="space-y-2.5 mb-5">
-                              {[
-                                { text: 'Your dataset is ready for download', href: null },
-                                { text: 'View all datasets in the', link: 'Catalog', href: '/catalog' },
-                                { text: 'Validate model readiness on', link: 'Data Quality', href: '/data-quality' },
-                              ].map((item, i) => (
-                                <motion.li
-                                  key={i}
-                                  initial={{ opacity: 0, x: -8 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: i * 0.08 }}
-                                  className="flex items-center gap-2 text-xs text-gray-600"
-                                >
-                                  <ChevronRight className="w-3 h-3 text-green-500 shrink-0" />
-                                  <span>
-                                    {item.text}{' '}
-                                    {item.href && (
-                                      <Link href={item.href} className="text-green-600 font-semibold hover:underline">
-                                        {item.link}
-                                      </Link>
-                                    )}
-                                  </span>
-                                </motion.li>
-                              ))}
-                            </ul>
-
-                            <div className="pt-4 border-t border-gray-200">
-                              <p className="text-xs font-medium text-gray-600 mb-3">
-                                Ready to check training quality?
-                              </p>
-                              <Link href="/data-quality">
-                                <Button className="w-full sm:w-auto gap-2 bg-green-600 hover:bg-green-700 text-white text-xs h-9">
-                                  <Upload className="h-3.5 w-3.5" />
-                                  Check Data Quality
-                                </Button>
-                              </Link>
-                            </div>
+                      {/* Next steps */}
+                      <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
+                            <CheckCircle className="w-3 h-3 text-green-600" />
                           </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        </div>
+                          <h3 className="text-sm font-semibold text-gray-800">Dataset ready</h3>
+                        </div>
+                        <ul className="space-y-2 mb-5">
+                          {[
+                            { text: 'Your dataset is ready for download' },
+                            { text: 'View all datasets in the', link: 'Catalog', href: '/catalog' },
+                            { text: 'Validate model readiness on', link: 'Data Quality', href: '/data-quality' },
+                          ].map((item, i) => (
+                            <motion.li
+                              key={i}
+                              initial={{ opacity: 0, x: -6 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: i * 0.07 }}
+                              className="flex items-center gap-2 text-xs text-gray-500"
+                            >
+                              <ChevronRight className="w-3 h-3 text-green-500 shrink-0" />
+                              <span>
+                                {item.text}{' '}
+                                {item.href && (
+                                  <Link href={item.href} className="text-green-600 font-semibold hover:underline">
+                                    {item.link}
+                                  </Link>
+                                )}
+                              </span>
+                            </motion.li>
+                          ))}
+                        </ul>
+                        <div className="pt-4 border-t border-gray-100">
+                          <p className="text-xs text-gray-500 font-medium mb-3">Ready to check training quality?</p>
+                          <Link href="/data-quality">
+                            <Button className="w-full sm:w-auto gap-2 bg-green-600 hover:bg-green-700 text-white text-xs h-9 rounded-xl">
+                              <Upload className="h-3.5 w-3.5" />
+                              Check Data Quality
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            </motion.div>
+          )}
+
+        </AnimatePresence>
       </main>
     </div>
   )
 }
 
 function extractDomain(prompt: string): string {
-  const domains = ['Healthcare', 'FinTech', 'Agriculture', 'Education', 'Energy', 'Labor']
+  const map: Record<string, string> = { healthcare: 'Healthcare', health: 'Healthcare', malaria: 'Healthcare', fintech: 'FinTech', finance: 'FinTech', transaction: 'FinTech', agriculture: 'Agriculture', crop: 'Agriculture', education: 'Education', school: 'Education', energy: 'Energy', labor: 'Labor' }
   const lower = prompt.toLowerCase()
-  for (const domain of domains) {
-    if (lower.includes(domain.toLowerCase())) return domain
-  }
+  for (const [k, v] of Object.entries(map)) { if (lower.includes(k)) return v }
   return 'General'
 }
 
 function extractCountry(prompt: string): string {
-  const countries: Record<string, string> = {
-    nigeria: 'Nigeria', nigerian: 'Nigeria',
-    kenya: 'Kenya', kenyan: 'Kenya',
-    ghana: 'Ghana', ghanaian: 'Ghana',
-    'south africa': 'South Africa',
-    uganda: 'Uganda', senegal: 'Senegal',
-  }
+  const map: Record<string, string> = { nigeria: 'Nigeria', nigerian: 'Nigeria', kenya: 'Kenya', kenyan: 'Kenya', ghana: 'Ghana', ghanaian: 'Ghana', 'south africa': 'South Africa', uganda: 'Uganda', senegal: 'Senegal', ethiopia: 'Ethiopia', tanzania: 'Tanzania' }
   const lower = prompt.toLowerCase()
-  for (const [key, value] of Object.entries(countries)) {
-    if (lower.includes(key)) return value
-  }
+  for (const [k, v] of Object.entries(map)) { if (lower.includes(k)) return v }
   return 'Africa'
 }

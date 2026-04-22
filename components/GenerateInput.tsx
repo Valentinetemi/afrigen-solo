@@ -9,14 +9,6 @@ interface GenerateInputProps {
   initialPrompt?: string
 }
 
-const DOMAINS = [
-  { id: 'health', label: 'Health', emoji: '🏥', hint: 'malaria, patient records, clinic visits' },
-  { id: 'finance', label: 'Finance', emoji: '💳', hint: 'mobile money, transactions, loans' },
-  { id: 'agriculture', label: 'Agriculture', emoji: '🌾', hint: 'crop yields, farm data, weather' },
-  { id: 'education', label: 'Education', emoji: '📚', hint: 'student scores, school records' },
-  { id: 'transport', label: 'Transport', emoji: '🚌', hint: 'routes, fares, ridership' },
-]
-
 const COUNTRIES = ['Nigeria', 'Kenya', 'Ghana', 'South Africa', 'Ethiopia', 'Tanzania', 'Rwanda', 'Uganda']
 
 const ROW_PRESETS = [
@@ -157,9 +149,6 @@ export function GenerateInput({ onSubmit, isLoading = false, initialPrompt = '' 
         transition={{ delay: 0.1 }}
         className="flex flex-col gap-2"
       >
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-          Dataset Domain <span className="normal-case font-normal">(optional)</span>
-        </span>
         <div className="flex flex-wrap gap-2">
           {DOMAINS.map((d, i) => (
             <motion.button

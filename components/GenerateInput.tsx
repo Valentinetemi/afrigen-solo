@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 interface GenerateInputProps {
   onSubmit: (prompt: string) => Promise<void>
   isLoading?: boolean
+  initialPrompt?: string
 }
 
 const DOMAINS = [
@@ -87,8 +88,25 @@ function getChecks(prompt: string, rowCount: number) {
   ]
 }
 
-export function GenerateInput({ onSubmit, isLoading = false }: GenerateInputProps) {
-  const [prompt, setPrompt] = useState('')
+export function GenerateInput({ onSubmit, isLoading = false, initialPrompt = '' }: GenerateInputProps) {
+  const [prompt, setPrompt] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('generate_current_prompt') || initialPrompt
+    }
+    return initialPrompt
+  })
+
+  useEffect(() => {
+    if (initialPrompt) {
+      setPrompt(initialPrompt)
+    }
+  }, [initialPrompt])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('generate_current_prompt', prompt)
+    }
+  }, [prompt])
   const [domain, setDomain] = useState('')
   const [country, setCountry] = useState('Nigeria')
   const [rowCount, setRowCount] = useState(1000)

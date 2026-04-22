@@ -37,13 +37,15 @@ export interface QualityAnalysisResult {
   overallCompleteness: number
   piiColumnsCount: number
   summary: string
+  rawCsv?: string
 }
 
 export function analyzeData(
   rows: any[],
   headers: string[],
   detectedDomain: string,
-  fileSize: number
+  fileSize: number,
+  rawCsv?: string
 ): QualityAnalysisResult {
   const columnAnalysis = analyzeColumns(rows, headers)
   const duplicateMetrics = findDuplicates(rows)
@@ -103,6 +105,7 @@ export function analyzeData(
       modelReadinessScore,
       piiColumnsCount
     ),
+    rawCsv,
   }
 }
 

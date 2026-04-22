@@ -200,7 +200,7 @@ export function QualityAnalysisResults({ analysis, onDownloadReport }: QualityAn
   const readiness = getReadinessLabel(analysis.modelReadinessScore)
   const ReadinessIcon = readiness.icon
   const [cleaning, setCleaning] = useState(false)
-const [cleanedCsv, setCleanedCsv] = useState<string | null>(null)
+  const [cleanedCsv, setCleanedCsv] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchRec() {
@@ -239,6 +239,31 @@ Columns: ${analysis.columns.map(c => `${c.name} (${c.dataType}, ${c.missingPerce
   const item = {
     hidden: { opacity: 0, y: 14 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.38, ease: 'easeOut' } },
+  }
+  
+  const handleCleanData = async () => {
+    setCleaning(true)
+      try {
+      const report = `Score: ${analysis.modelReadinessScore}/100, 
+        Rows: ${analysis.totalRows}, Columns: ${analysis.totalColumns},
+        PII columns: ${analysis.columns.filter(c => c.isPII).map(c => c.name).join(', ')},
+        High missing: ${analysis.columns.filter(c => c.missingPercentage > 20).map(c => c.name).join(', ')}`
+  
+      const res = await fetch('/api/clean', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          csvContent: analysis.rawCsv,
+          analysisReport: report,
+        }),
+      })
+      const data = await res.json()
+      setCleanedCsv(data.cleanedCsv)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setCleaning(false)
+    }
   }
 
   return (
@@ -386,31 +411,6 @@ Columns: ${analysis.columns.map(c => `${c.name} (${c.dataType}, ${c.missingPerce
         </div>
       </motion.div>
 
-      const handleCleanData = async () => {
-  setCleaning(true)
-  try {
-    const report = `Score: ${analysis.modelReadinessScore}/100, 
-      Rows: ${analysis.totalRows}, Columns: ${analysis.totalColumns},
-      PII columns: ${analysis.columns.filter(c => c.isPII).map(c => c.name).join(', ')},
-      High missing: ${analysis.columns.filter(c => c.missingPercentage > 20).map(c => c.name).join(', ')}`
-
-    const res = await fetch('/api/clean', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        csvContent: analysis.rawCsv,
-        analysisReport: report,
-      }),
-    })
-    const data = await res.json()
-    setCleanedCsv(data.cleanedCsv)
-  } catch (e) {
-    console.error(e)
-  } finally {
-    setCleaning(false)
-  }
-}
- 
       {/* ── Download ── */}
       {onDownloadReport && (
         <motion.div variants={item}>

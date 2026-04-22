@@ -14,13 +14,15 @@ export async function POST(req: Request) {
 
     // Parse the file
     const parsedData = await parseFile(file)
+    const rawCsv = await file.text()
 
     // Analyze the data
     const analysis = analyzeData(
       parsedData.rows,
       parsedData.headers,
       parsedData.detectedDomain,
-      file.size
+      file.size,
+      rawCsv
     )
 
     return Response.json({ analysis })

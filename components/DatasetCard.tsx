@@ -1,9 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import { Download, Eye } from 'lucide-react'
+import { Download, Sparkles } from 'lucide-react'
 
 interface DatasetCardProps {
   id: string
@@ -127,15 +128,17 @@ export function DatasetCard({
         {/* Action buttons */}
         <div className="flex gap-1 sm:gap-2 pt-2">
           <motion.div className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-xs sm:text-sm"
-            >
-              <Eye className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />
-              <span className="hidden sm:inline">Preview</span>
-              <span className="sm:hidden">View</span>
-            </Button>
+            <Link href={`/generate?prompt=${encodeURIComponent(`Generate a dataset for ${name}`)}`}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs sm:text-sm"
+              >
+                <Sparkles className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4 text-amber-500" />
+                <span className="hidden sm:inline">Generate</span>
+                <span className="sm:hidden">New</span>
+              </Button>
+            </Link>
           </motion.div>
           <motion.div className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Button

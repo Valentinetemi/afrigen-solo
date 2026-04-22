@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Navbar } from '@/components/Navbar'
 import { GenerateInput } from '@/components/GenerateInput'
@@ -203,12 +204,61 @@ function StreamingHeader({ rowCount, isStreaming }: { rowCount: number; isStream
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function GeneratePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#f8f9fa]">
+        <Navbar />
+        <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-8 sm:py-10 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+        </main>
+      </div>
+    }>
+      <GeneratePageContent />
+    </Suspense>
+  )
+}
+
+function GeneratePageContent() {
+  const searchParams = useSearchParams()
+  const initialPrompt = searchParams.get('prompt') || ''
+
   const [streamContent, setStreamContent] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [generatedData, setGeneratedData] = useState<any[]>([])
   const [headers, setHeaders] = useState<string[]>([])
   const [hasCompleted, setHasCompleted] = useState(false)
   const [rowCount, setRowCount] = useState(0)
+
+  // Load state from localStorage on mount
+  useEffect(() => {
+    const savedStream = localStorage.getItem('generate_stream_content')
+    const savedData = localStorage.getItem('generate_data')
+    const savedHeaders = localStorage.getItem('generate_headers')
+    const savedCompleted = localStorage.getItem('generate_has_completed')
+    const savedRowCount = localStorage.getItem('generate_row_count')
+
+    if (savedStream) setStreamContent(savedStream)
+    if (savedData) setGeneratedData(JSON.parse(savedData))
+    if (savedHeaders) setHeaders(JSON.parse(savedHeaders))
+    if (savedCompleted === 'true') setHasCompleted(true)
+    if (savedRowCount) setRowCount(parseInt(savedRowCount))
+  }, [])
+
+  // Save state to localStorage
+  useEffect(() => {
+    localStorage.setItem('generate_stream_content', streamContent)
+    localStorage.setItem('generate_data', JSON.stringify(generatedData))
+    localStorage.setItem('generate_headers', JSON.stringify(headers))
+    localStorage.setItem('generate_has_completed', String(hasCompleted))
+    localStorage.setItem('generate_row_count', String(rowCount))
+  }, [streamContent, generatedData, headers, hasCompleted, rowCount])
+
+  // Handle initial prompt from URL
+  useEffect(() => {
+    if (initialPrompt && !isStreaming && generatedData.length === 0) {
+      handleGenerate(initialPrompt)
+    }
+  }, [initialPrompt])
 
   const handleGenerate = async (prompt: string) => {
     setStreamContent('')
@@ -217,6 +267,9 @@ export default function GeneratePage() {
     setHasCompleted(false)
     setIsStreaming(true)
     setRowCount(0)
+    
+    // Clear prompt in storage to avoid loop if we add logic for it
+    localStorage.removeItem('generate_current_prompt')
 
     try {
       const response = await fetch('/api/generate', {
@@ -304,7 +357,7 @@ export default function GeneratePage() {
             className="flex flex-col"
           >
             <div className="sticky top-6 rounded-2xl border border-gray-200 bg-white shadow-sm p-6 sm:p-8">
-              <GenerateInput onSubmit={handleGenerate} isLoading={isStreaming} />
+              <GenerateInput onSubmit={handleGenerate} isLoading={isStreaming} initialPrompt={initialPrompt} />
 
               {/* Pro tip */}
               <div className="mt-6 pt-5 border-t border-gray-100">

@@ -1,11 +1,13 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { generateText, streamText } from 'ai'
+import { fetchReferenceData } from './reference-data'
+import { extractDomain, extractCountry } from '../utils/extract'
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY!,
 })
 
-const model = google('gemini-flash-latest ')
+const model = google('gemini-2.0-flash')
 
 // ─── African context knowledge base ───────────────────────────────────────────
 
@@ -56,30 +58,20 @@ interface ParsedPrompt {
 function parseUserPrompt(userPrompt: string): ParsedPrompt {
   const lower = userPrompt.toLowerCase()
 
-  // Extract row count
   const rowMatch = userPrompt.match(/(\d[\d,]*)\s*(rows?|records?|samples?|entries|data points?)/i)
-  let rowCount = 500 // safe default
-  if (rowMatch) {
-    rowCount = Math.min(parseInt(rowMatch[1].replace(/,/g, '')), 2000) // cap at 2000 for quality
-  }
+  let rowCount = 500
+  if (rowMatch) rowCount = Math.min(parseInt(rowMatch[1].replace(/,/g, '')), 2000)
 
-  // Detect country
-  let country = 'nigeria' // default
+  let country = 'nigeria'
   if (lower.includes('kenya') || lower.includes('nairobi')) country = 'kenya'
   else if (lower.includes('ghana') || lower.includes('accra')) country = 'ghana'
   else if (lower.includes('south africa') || lower.includes('johannesburg')) country = 'southAfrica'
 
-  // Extract region mentions
   let region = ''
-  const nigerianStates = AFRICAN_CONTEXT.nigeria.states
-  for (const state of nigerianStates) {
-    if (lower.includes(state.toLowerCase())) {
-      region = state
-      break
-    }
+  for (const state of AFRICAN_CONTEXT.nigeria.states) {
+    if (lower.includes(state.toLowerCase())) { region = state; break }
   }
 
-  // Extract column hints from prompt
   const columnKeywords: Record<string, string[]> = {
     health: ['age', 'gender', 'diagnosis', 'symptoms', 'treatment', 'outcome', 'facility', 'lga', 'date_of_visit'],
     finance: ['transaction_id', 'sender', 'receiver', 'amount', 'currency', 'channel', 'timestamp', 'status'],
@@ -92,8 +84,9 @@ function parseUserPrompt(userPrompt: string): ParsedPrompt {
   let columns: string[] = []
 
   for (const [domain, cols] of Object.entries(columnKeywords)) {
-    if (lower.includes(domain) ||
-      (domain === 'health' && (lower.includes('malaria') || lower.includes('patient') || lower.includes('hospital') || lower.includes('disease'))) ||
+    if (
+      lower.includes(domain) ||
+      (domain === 'health' && (lower.includes('malaria') || lower.includes('patient') || lower.includes('hospital'))) ||
       (domain === 'finance' && (lower.includes('mobile money') || lower.includes('transaction') || lower.includes('bank'))) ||
       (domain === 'agriculture' && (lower.includes('crop') || lower.includes('farm') || lower.includes('yield')))
     ) {
@@ -103,26 +96,18 @@ function parseUserPrompt(userPrompt: string): ParsedPrompt {
     }
   }
 
-  // If user mentioned specific columns, extract them
   const columnMatch = userPrompt.match(/with\s+([^.]+?)(?:\s+data|\s+information|\s+fields|\s+columns|$)/i)
   if (columnMatch) {
     const mentioned = columnMatch[1].split(/,|and/).map(s => s.trim().toLowerCase().replace(/\s+/g, '_')).filter(Boolean)
     if (mentioned.length > 0) columns = [...new Set([...columns, ...mentioned])]
   }
 
-  return {
-    topic: userPrompt,
-    rowCount,
-    country,
-    region,
-    columns,
-    domainHints,
-  }
+  return { topic: userPrompt, rowCount, country, region, columns, domainHints }
 }
 
-// ─── Structured system prompt builder ─────────────────────────────────────────
+// ─── System prompt builder ─────────────────────────────────────────────────────
 
-function buildStructuredSystemPrompt(parsed: ParsedPrompt): string {
+function buildSystemPrompt(parsed: ParsedPrompt, referenceData?: string | null): string {
   const ctx = AFRICAN_CONTEXT[parsed.country as keyof typeof AFRICAN_CONTEXT] || AFRICAN_CONTEXT.nigeria
   const columnList = parsed.columns.length > 0 ? parsed.columns.join(', ') : 'infer appropriate columns from the topic'
   const regionCtx = parsed.region || (parsed.country === 'nigeria' ? 'Lagos or Kano' : 'the capital region')
@@ -141,7 +126,7 @@ function buildStructuredSystemPrompt(parsed: ParsedPrompt): string {
 - Return ONLY valid CSV. First row is headers. No explanations, no markdown, no backticks, no commentary.
 - Every row must be complete — no empty fields unless the column is explicitly nullable.
 - Escape commas inside values by wrapping in double quotes.
-- All categorical columns must use EXACTLY the same spelling/casing throughout (e.g. always "Male", never mixing "male", "M", "MALE").
+- All categorical columns must use EXACTLY the same spelling/casing throughout (e.g. always "Male", never "male" or "M").
 - Date format: YYYY-MM-DD. Timestamps: YYYY-MM-DD HH:MM:SS.
 - Numbers must be numeric only — no units inside cells (e.g. 42 not "42kg").
 
@@ -157,15 +142,20 @@ ${columnList}
 ## CULTURAL AUTHENTICITY
 - Names must reflect the ethnicity of the region (${ctx.ethnicGroups.join(', ')}).
 - Currency: ${ctx.currency}. Phone prefix: ${ctx.phonePrefix}.
-- Socioeconomic values must reflect realistic African distributions (e.g. mobile money amounts in NGN, not USD).
+- Socioeconomic values must reflect realistic African distributions.
 
-## DATA QUALITY REQUIREMENTS
-- NO PII patterns: Do not generate real ID numbers, passport numbers, or unique biometric data.
-- NO patient names or individual identifiers if this is health data — use Patient_ID format (e.g. PT-00142).
-- Categorical consistency: pick 4-8 fixed categories per categorical column and reuse them across ALL rows.
-- Realistic distributions: ~60% most common category, ~25% second, rest spread across others.
-- Numeric ranges must be realistic (e.g. adult ages 18-75, not 0-200).
-- Include ~3-5% realistic missing values (empty string) in non-critical columns only.
+${referenceData ? `## REAL-WORLD REFERENCE DATA (World Bank / WHO)
+Use these verified statistics as ground truth for distributions and values:
+${referenceData}
+Distributions in your generated data MUST align with these figures.
+
+` : ''}## DATA QUALITY REQUIREMENTS
+- NO PII: Do not generate real ID numbers, passport numbers, or biometric data.
+- NO patient names — use Patient_ID format (e.g. PT-00142).
+- Categorical consistency: pick 4–8 fixed categories per column and reuse across ALL rows.
+- Realistic distributions: ~60% most common category, ~25% second, rest spread.
+- Numeric ranges must be realistic (adult ages 18–75, not 0–200).
+- Include ~3–5% realistic missing values in non-critical columns only.
 
 ## ROW COUNT
 Generate exactly ${parsed.rowCount} data rows (not counting the header).`
@@ -178,7 +168,6 @@ export function postProcessCSV(rawCSV: string): string {
     .split('\n')
     .map(l => l.trim())
     .filter(l => l.length > 0)
-    // Remove any markdown artifacts
     .filter(l => !l.startsWith('```') && !l.startsWith('#') && !l.startsWith('//'))
 
   if (lines.length < 2) return rawCSV
@@ -187,14 +176,12 @@ export function postProcessCSV(rawCSV: string): string {
   const headers = parseCSVLine(header)
   const dataLines = lines.slice(1)
 
-  // Normalize categorical columns
   const columnCategories: Map<number, Map<string, string>> = new Map()
 
-  // First pass: collect categories per column
   for (const line of dataLines) {
     const values = parseCSVLine(line)
     values.forEach((val, i) => {
-      if (!val || !isNaN(Number(val))) return // skip numeric/empty
+      if (!val || !isNaN(Number(val))) return
       if (!columnCategories.has(i)) columnCategories.set(i, new Map())
       const cats = columnCategories.get(i)!
       const normalized = toTitleCase(val.trim())
@@ -202,26 +189,19 @@ export function postProcessCSV(rawCSV: string): string {
     })
   }
 
-  // Second pass: normalize values
   const cleanedLines = dataLines.map(line => {
     const values = parseCSVLine(line)
-    // Pad or trim to match header count
     while (values.length < headers.length) values.push('')
     const trimmed = values.slice(0, headers.length)
-
     const normalized = trimmed.map((val, i) => {
       if (!val) return ''
       const cats = columnCategories.get(i)
-      if (cats && cats.has(val.toLowerCase())) {
-        return cats.get(val.toLowerCase())!
-      }
+      if (cats?.has(val.toLowerCase())) return cats.get(val.toLowerCase())!
       return val
     })
-
     return normalized.map(v => (v.includes(',') ? `"${v}"` : v)).join(',')
   })
 
-  // Remove duplicate rows
   const seen = new Set<string>()
   const deduped = cleanedLines.filter(line => {
     if (seen.has(line)) return false
@@ -236,17 +216,10 @@ function parseCSVLine(line: string): string[] {
   const result: string[] = []
   let current = ''
   let inQuotes = false
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-    if (char === '"') {
-      inQuotes = !inQuotes
-    } else if (char === ',' && !inQuotes) {
-      result.push(current.trim())
-      current = ''
-    } else {
-      current += char
-    }
+  for (const char of line) {
+    if (char === '"') inQuotes = !inQuotes
+    else if (char === ',' && !inQuotes) { result.push(current.trim()); current = '' }
+    else current += char
   }
   result.push(current.trim())
   return result
@@ -256,46 +229,43 @@ function toTitleCase(str: string): string {
   return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase())
 }
 
-// ─── Main exports ──────────────────────────────────────────────────────────────
+// ─── Single exported function — merges structured prompt + reference data ──────
 
 export async function streamSyntheticDataGeneration(userPrompt: string) {
   const parsed = parseUserPrompt(userPrompt)
-  const systemPrompt = buildStructuredSystemPrompt(parsed)
+
+  // Try to fetch real World Bank / WHO reference data
+  let referenceData: string | null = null
+  try {
+    const domain = extractDomain(userPrompt)
+    const country = extractCountry(userPrompt)
+    referenceData = await fetchReferenceData(domain, country)
+  } catch (err) {
+    // Non-fatal — fall back to structured prompt only
+    console.warn('Reference data fetch failed, continuing without it:', err)
+  }
+
+  const systemPrompt = buildSystemPrompt(parsed, referenceData)
 
   return streamText({
     model,
     system: systemPrompt,
     prompt: `Generate a synthetic CSV dataset for: ${userPrompt}`,
-    temperature: 0.4, // lower = more consistent, less hallucination
-  })
-}
-
-export async function generateSyntheticData(userPrompt: string): Promise<string> {
-  const parsed = parseUserPrompt(userPrompt)
-  const systemPrompt = buildStructuredSystemPrompt(parsed)
-
-  const { text } = await generateText({
-    model,
-    system: systemPrompt,
-    prompt: `Generate a synthetic CSV dataset for: ${userPrompt}`,
     temperature: 0.4,
   })
-
-  return postProcessCSV(text)
 }
 
-export async function generateAIRecommendation(analysisReport: string): Promise<string> {
-  const systemPrompt = `You are a data science expert helping African data scientists understand data quality and model readiness.
-Provide a concise, specific, one-paragraph recommendation (2-3 sentences) based on the data quality analysis provided.
-Focus on: what's good about this dataset, what needs fixing, and whether it's ready for model training.
-Be specific - don't use generic advice.`
+// ─── AI recommendation ─────────────────────────────────────────────────────────
 
+export async function generateAIRecommendation(analysisReport: string): Promise<string> {
   const { text } = await generateText({
     model,
-    system: systemPrompt,
+    system: `You are a data science expert helping African data scientists understand data quality and model readiness.
+Provide a concise, specific, one-paragraph recommendation (2-3 sentences) based on the data quality analysis provided.
+Focus on: what's good about this dataset, what needs fixing, and whether it's ready for model training.
+Be specific — do not use generic advice.`,
     prompt: `Data Quality Analysis:\n${analysisReport}\n\nProvide a specific recommendation.`,
     temperature: 0.3,
   })
-
   return text
 }

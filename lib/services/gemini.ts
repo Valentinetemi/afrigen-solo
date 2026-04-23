@@ -298,9 +298,12 @@ Return ONLY valid JSON, nothing else:
     const finalScore = Math.round(
       0.8 * llmResult.score + 0.2 * completeness
     )
-    return JSON.parse(clean)
+    return{
+      score: finalScore,
+      justification: llmResult.justification
+    }
   } catch {
-    return { score: 75, justification: 'Unable to calculate fidelity score' }
+    return { score: 50, justification: 'Fallback due to parsing error }
   }
  
 }

@@ -191,25 +191,27 @@ function detectDataType(values: any[]): string {
   let booleanCount = 0
 
   for (const value of values.slice(0, 100)) {
-    const str = String(value).toLowerCase()
+    const str = String(value).trim().toLowerCase()
 
-    if (/^true|false|yes|no|0|1$/.test(str)) {
+    // Strict boolean — only exact matches
+    if (/^(true|false|yes|no)$/.test(str)) {
       booleanCount++
-    } else if (!isNaN(parseFloat(str))) {
+    // Strict numeric — must be a valid number, not just contain digits
+    } else if (!isNaN(Number(str)) && str !== '') {
       numericCount++
+    // Date patterns
     } else if (
-      /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(str)
+      /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$|^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(str)
     ) {
       dateCount++
     }
   }
 
-  const total = values.slice(0, 100).length
+  const total = Math.min(values.length, 100)
 
+  if (booleanCount > total * 0.8) return 'boolean'
   if (numericCount > total * 0.8) return 'numeric'
   if (dateCount > total * 0.8) return 'date'
-  if (booleanCount > total * 0.8) return 'boolean'
-
   return 'text'
 }
 

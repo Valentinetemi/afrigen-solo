@@ -90,7 +90,7 @@ export async function registerDataset({
 
     const table = await res.json()
 
-    // Step 3 — post lineage
+    // post lineage
     if (table.id) {
       await postLineage(table.id, name, domain)
     }

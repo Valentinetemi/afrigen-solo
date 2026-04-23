@@ -282,20 +282,22 @@ export async function streamSyntheticDataGeneration(userPrompt: string) {
   try {
     const domain = extractDomain(userPrompt)
     const country = extractCountry(userPrompt)
-    referenceData = await fetchReferenceData(domain, country)
-  } catch (err) {
-    // Non-fatal — fall back to structured prompt only
-    console.warn('Reference data fetch failed, continuing without it:', err)
-  }
 
+    const referenceData = await Promise.race([
+      fetchReferenceData(domain, country),
+      new Promise<string>(resolve => setTimeout(() => resolve(''), 3000))
+    ])
   const systemPrompt = buildSystemPrompt(parsed, referenceData)
 
-  return streamText({
+  const stream = streamText({
     model,
     system: systemPrompt,
     prompt: `Generate a synthetic CSV dataset for: ${userPrompt}`,
-    temperature: 0.4,
+    temperature: 0.7,
   })
+
+  return { stream, domain, country, referenceData }
+}
 }
 
 // ─── AI recommendation ─────────────────────────────────────────────────────────

@@ -11,7 +11,9 @@ export async function POST(req: Request) {
       })
     }
 
-    const result = await streamSyntheticDataGeneration(prompt)
+    const { stream, domain, country, referenceData} = await streamSyntheticDataGeneration(prompt)
+
+    //this is just to store the context in response header so the frontend can use it
 
     return result.toTextStreamResponse()
   } catch (error) {

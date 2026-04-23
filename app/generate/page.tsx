@@ -11,6 +11,7 @@ import { ExportToggle } from '@/components/ExportToggle'
 import { Button } from '@/components/ui/button'
 import { csvToJSON } from '@/lib/utils/csv-export'
 import { ChevronRight, Upload, CheckCircle, Sparkles } from 'lucide-react'
+import { calculateFidelityScore } from '@/lib/services/gemini'
 
 // ── Live row counter bar ───────────────────────────────────────────────────────
 function StreamingHeader({ rowCount, isStreaming }: { rowCount: number; isStreaming: boolean }) {
@@ -135,7 +136,12 @@ export default function GeneratePage() {
         })
       }
 
-      // Calculate real fidelity score
+      const jsonData = csvToJSON(buffer)
+      const parsedHeaders = jsonData.length > 0 ? Object.keys(jsonData[0]) : []
+      const domain = extractDomain(prompt)
+      const country = extractCountry(prompt)
+
+// Calculate real fidelity score
 const fidelityRes = await fetch('/api/fidelity', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -157,11 +163,6 @@ await fetch('/api/metadata', {
     prompt,
   })
 })
-
-      const jsonData = csvToJSON(buffer)
-      const parsedHeaders = jsonData.length > 0 ? Object.keys(jsonData[0]) : []
-      const domain = extractDomain(prompt)
-      const country = extractCountry(prompt)
 
       setHeaders(parsedHeaders)
       setGeneratedData(jsonData)
@@ -190,7 +191,7 @@ await fetch('/api/metadata', {
               country,
               rowCount: jsonData.length,
               columns: parsedHeaders,
-              fidelityScore: Math.floor(Math.random() * 15) + 80, // 80-95
+              fidelityScore: score,
               prompt,
             })
           })

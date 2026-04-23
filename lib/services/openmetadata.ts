@@ -32,7 +32,7 @@ export async function createAfriGenService() {
   }
 }
 
-// Register a generated dataset as a Table Entity
+// This is to register a generated dataset as a Table Entity
 export async function registerDataset({
   name,
   domain,

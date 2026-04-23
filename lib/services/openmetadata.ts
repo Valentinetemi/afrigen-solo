@@ -51,7 +51,8 @@ export async function registerDataset({
   prompt: string
 }) {
   try {
-    // Step 1 — make sure database + schema exist
+
+    // To make sure database and schema exist
     await ensureDatabaseExists()
 
     // Step 2 — register the table

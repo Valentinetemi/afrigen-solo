@@ -238,8 +238,15 @@ export async function calculateFidelityScore(
   country: string,
   referenceData: string
 ): Promise<{ score: number; justification: string }> {
-  const rows = csvData.split('\n').slice(0, 20).join('\n') // the first 20 rows
-
+  function sampleRows(csv: string, n = 20) {
+    const rows = csv.split('\n').filter(Boolean)
+    const header = rows[0]
+    const body = rows.slice(1)
+  
+    const shuffled = body.sort(() => 0.5 - Math.random())
+    return [header, ...shuffled.slice(0, n)].join('\n')
+  }
+  const rows = sampleRows
   const { text } = await generateText({
     model,
     prompt: `You are an African data scientist evaluating synthetic data quality.
@@ -279,14 +286,21 @@ export async function streamSyntheticDataGeneration(userPrompt: string) {
 
   // Try to fetch real World Bank / WHO reference data
   let referenceData: string | null = null
+  let domain = ''
+  let country = ''
   try {
     const domain = extractDomain(userPrompt)
     const country = extractCountry(userPrompt)
 
-    const referenceData = await Promise.race([
+    referenceData = await Promise.race([
       fetchReferenceData(domain, country),
       new Promise<string>(resolve => setTimeout(() => resolve(''), 3000))
     ])
+  }
+  catch (err)
+  {
+    console.error(err)
+  }
   const systemPrompt = buildSystemPrompt(parsed, referenceData)
 
   const stream = streamText({
@@ -297,7 +311,6 @@ export async function streamSyntheticDataGeneration(userPrompt: string) {
   })
 
   return { stream, domain, country, referenceData }
-}
 }
 
 // ─── AI recommendation ─────────────────────────────────────────────────────────

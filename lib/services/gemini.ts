@@ -231,7 +231,48 @@ function toTitleCase(str: string): string {
   return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase())
 }
 
-// ─── Single exported function — merges structured prompt + reference data ──────
+export async function calculateFidelityScore(
+  csvData: string,
+  prompt: string,
+  domain: string,
+  country: string,
+  referenceData: string
+): Promise<{ score: number; justification: string }> {
+  const rows = csvData.split('\n').slice(0, 20).join('\n') // the first 20 rows
+
+  const { text } = await generateText({
+    model,
+    prompt: `You are an African data scientist evaluating synthetic data quality.
+
+User requested: "${prompt}"
+Domain: ${domain}
+Country: ${country}
+
+${referenceData ? `Real reference statistics:\n${referenceData}\n` : ''}
+
+Here are the first 20 rows of the generated data:
+${rows}
+
+Score this dataset's fidelity from 0-100 based on:
+- Are names culturally accurate for ${country}? (25 pts)
+- Do geographic locations match real ${country} regions? (25 pts)  
+- Do distributions match real-world patterns for ${domain} in ${country}? (25 pts)
+- Are values statistically realistic for this African context? (25 pts)
+
+Return ONLY valid JSON, nothing else:
+{"score": <number>, "justification": "<one sentence explanation>"}`,
+    temperature: 0.1,
+  })
+
+  try {
+    const clean = text.replace(/```json|```/g, '').trim()
+    return JSON.parse(clean)
+  } catch {
+    return { score: 75, justification: 'Unable to calculate fidelity score' }
+  }
+}
+
+// - Single exported function - merges structured prompt and reference data -
 
 export async function streamSyntheticDataGeneration(userPrompt: string) {
   const parsed = parseUserPrompt(userPrompt)

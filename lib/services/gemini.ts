@@ -303,9 +303,8 @@ Return ONLY valid JSON, nothing else:
       justification: llmResult.justification
     }
   } catch {
-    return { score: 50, justification: 'Fallback due to parsing error }
+    return { score: 50, justification: 'Fallback due to parsing error' }
   }
- 
 }
 
 // - Single exported function - merges structured prompt and reference data -

@@ -24,16 +24,16 @@ const COUNTRIES = [
 ]
 
 const ROW_PRESETS = [
-  { label: '500', value: 500 },
+ { label: '500', value: 500 },
   { label: '1,000', value: 1000 },
   { label: '2,000', value: 2000 },
 ]
 
 const PLACEHOLDERS = [
-  'Malaria patient records for Kano State — age, symptoms, test results, outcomes…',
-  'Mobile money transactions for Lagos — sender, receiver, amount, channel…',
-  'Crop yield records for Ogun State — type, rainfall, temperature, harvest…',
-  'Student exam records for Nairobi — subject, grade, school type, county…',
+  'Malaria patient records for Kano State with age, symptoms, test results, outcomes…',
+  'Mobile money transactions for Lagos with sender, receiver, amount, channel…',
+  'Crop yield records for Ogun State with type, rainfall, temperature, harvest…',
+  'Student exam records for Nairobi with subject, grade, school type, county…',
 ]
 
 const PII_TIPS: Record<string, string> = {

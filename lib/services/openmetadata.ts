@@ -6,10 +6,10 @@ const headers = {
   'Authorization': `Bearer ${OM_TOKEN}`,
 }
 
-// Step 1: Create the AfriGen service (only needs to succeed once)
+// Created the AfriGen service
 export async function createAfriGenService() {
   try {
-    // First check if it already exists
+    // First to check if it already exists
     const check = await fetch(`${OM_BASE}/api/v1/services/databaseServices/name/afrigen-synthetic`, {
       headers,
     })
@@ -20,7 +20,7 @@ export async function createAfriGenService() {
       return existing
     }
 
-    // Try to create it
+    // Then i try to create it
     const res = await fetch(`${OM_BASE}/api/v1/services/databaseServices`, {
       method: 'POST',
       headers,
@@ -47,7 +47,7 @@ export async function createAfriGenService() {
   }
 }
 
-// Step 2: Ensure database and schema exist under the service
+// Ensuring the database and schema exist under the service
 export async function ensureDatabaseExists() {
   // Create database (ignore if already exists)
   const dbRes = await fetch(`${OM_BASE}/api/v1/databases`, {
@@ -62,7 +62,7 @@ export async function ensureDatabaseExists() {
   const db = await dbRes.json()
   console.log('[OpenMetadata] Database:', db.name || db.message)
 
-  // Create schema (ignore if already exists)
+  // Create schema (ignore it if already exists)
   const schemaRes = await fetch(`${OM_BASE}/api/v1/databaseSchemas`, {
     method: 'POST',
     headers,
@@ -76,7 +76,7 @@ export async function ensureDatabaseExists() {
   console.log('[OpenMetadata] Schema:', schema.name || schema.message)
 }
 
-// Step 3: Register a generated dataset as a Table entity
+// Register a generated dataset as a Table entity
 export async function registerDataset({
   name,
   domain,
@@ -144,7 +144,7 @@ export async function registerDataset({
   }
 }
 
-// Step 4: Post lineage — WHO/World Bank → Gemini Pipeline → Table
+//  Post lineage, WHO/World Bank → Gemini Pipeline → Table
 async function postLineage(tableId: string, domain: string) {
   try {
     const res = await fetch(`${OM_BASE}/api/v1/lineage`, {
@@ -176,7 +176,7 @@ async function postLineage(tableId: string, domain: string) {
   }
 }
 
-// Step 5: Fetch all registered AfriGen datasets (for display in UI)
+// Fetch all registered AfriGen datasets (for display in UI)
 export async function getRegisteredDatasets() {
   try {
     const res = await fetch(
@@ -191,7 +191,7 @@ export async function getRegisteredDatasets() {
   }
 }
 
-// Step 6: Get a single dataset by FQN (for detail view)
+// Get a single dataset by FQN (for detail view)
 export async function getDatasetByName(tableName: string) {
   try {
     const fqn = `afrigen-synthetic.default.synthetic_datasets.${tableName}`

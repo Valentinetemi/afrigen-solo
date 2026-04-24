@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { GenerateInput } from "@/components/GenerateInput";
@@ -12,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { csvToJSON } from "@/lib/utils/csv-export";
 import { ChevronRight, Upload, CheckCircle, Sparkles } from "lucide-react";
 import { calculateFidelityScore } from "@/lib/services/gemini";
+import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 
 // ── Live row counter bar ───────────────────────────────────────────────────────
 function StreamingHeader({
@@ -65,6 +68,8 @@ function StreamingHeader({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function GeneratePage() {
+  const { toast } = useToast();
+  const router = useRouter();
   const [userPrompt, setUserPrompt] = useState("");
   const [streamContent, setStreamContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -157,27 +162,13 @@ export default function GeneratePage() {
       });
       const { score, justification } = await fidelityRes.json();
 
-      // Then register in OpenMetadata with real score
-      await fetch("/api/metadata", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: `${domain} Dataset - ${country}`,
-          domain,
-          country,
-          rowCount: jsonData.length,
-          columns: parsedHeaders,
-          fidelityScore: score,
-          prompt,
-        }),
-      });
-
       setHeaders(parsedHeaders);
       setGeneratedData(jsonData);
       setRowCount(jsonData.length);
 
       if (jsonData.length > 0) {
         try {
+          // Register in Catalog
           await fetch("/api/catalog", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -203,8 +194,26 @@ export default function GeneratePage() {
               prompt,
             }),
           });
+
+          toast({
+            title: "Dataset Generated Successfully! 🎉",
+            description: `Registered in OpenMetadata with a fidelity score of ${score}%.`,
+            action: (
+              <ToastAction
+                altText="View in Catalog"
+                onClick={() => router.push("/catalog")}
+              >
+                View Catalog
+              </ToastAction>
+            ),
+          });
         } catch (err) {
           console.error("External API error:", err);
+          toast({
+            title: "Metadata Sync Failed",
+            description: "The dataset was generated but failed to sync with OpenMetadata.",
+            variant: "destructive",
+          });
         }
       }
     } catch (error) {

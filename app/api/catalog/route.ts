@@ -1,44 +1,38 @@
-import { getCatalog, addDataset } from '@/lib/services/dataset-store'
+import { NextResponse } from 'next/server'
+
+const OM_BASE = process.env.OPENMETADATA_URL!
+const OM_TOKEN = process.env.OPENMETADATA_TOKEN!
+
+const headers = {
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${OM_TOKEN}`,
+}
 
 export async function GET() {
   try {
-    const datasets = getCatalog()
+    const res = await fetch(
+      `${OM_BASE}/api/v1/tables?databaseSchema=afrigen-synthetic.default.synthetic_datasets&limit=25&include=all`,
+      { headers }
+    )
+    const data = await res.json()
+    const tables = data.data || []
 
-    return Response.json({
-      datasets: datasets.map((d) => ({
-        id: d.id,
-        name: d.name,
-        description: d.description,
-        domain: d.domain,
-        country: d.country,
-        rowCount: d.rowCount,
-        columnCount: d.columnCount,
-        fidelityScore: d.fidelityScore,
-        createdAt: d.createdAt,
-      })),
-    })
-  } catch (error) {
-    console.error('Catalog GET error:', error)
-    return Response.json({ error: 'Failed to fetch catalog' }, { status: 500 })
-  }
-}
+    // this is to map OpenMetadata table shape to the dataset interface
+    const datasets = tables.map((table: any) => ({
+      id: table.id,
+      name: table.displayName || table.name,
+      description: table.description || '',
+      domain: table.extension?.domain || 'General',
+      country: table.extension?.country || 'Africa',
+      rowCount: table.extension?.rowCount || 0,
+      columnCount: table.columns?.length || 0,
+      fidelityScore: table.extension?.fidelityScore || 0,
+      createdAt: new Date(table.updatedAt).toISOString(),
+    }))
 
-export async function POST(req: Request) {
-  try {
-    const { csvData, name, domain, country } = await req.json()
-
-    if (!csvData || !name || !domain || !country) {
-      return Response.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
-    }
-
-    const dataset = addDataset(csvData, name, domain, country)
-
-    return Response.json({ dataset })
-  } catch (error) {
-    console.error(' Catalog POST error:', error)
-    return Response.json({ error: 'Failed to add dataset' }, { status: 500 })
+    return NextResponse.json({ datasets })
+  } catch (err) {
+    console.error('[Catalog] Failed to fetch from OpenMetadata:', err)
+    return NextResponse.json({ datasets: [] })
   }
 }

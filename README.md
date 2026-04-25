@@ -30,26 +30,26 @@ AfriGen is an AI-powered synthetic data infrastructure platform that:
 ## 🏗️ Architecture
 WHO API + World Bank API
 
-→
+↓
 
 Ground Truth Statistics
 
-→
+↓
 
 Gemini AI
 (generates synthetic rows
 matching real distributions)
 
-→
+↓
 
 Fidelity Scoring Engine
 
-→
+↓
 
 OpenMetadata Catalog
 (schema + lineage + governance)
 
-→
+↓
 
 AfriGen UI
 (generate, validate, download)

@@ -1,4 +1,4 @@
-# AfriGen — African Synthetic Data Infrastructure
+# AfriGen - African Synthetic Data Infrastructure
 
 > Generate. Govern. Validate. Built for African ML engineers.
 

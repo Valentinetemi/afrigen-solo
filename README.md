@@ -1,6 +1,6 @@
 # AfriGen - African Synthetic Data Infrastructure
 
-> Generate. Govern. Validate. Built for African ML engineers.
+> AfriGen is a synthetic data infrastructure platform for African ML engineers, designed to generate, govern, and validate high-fidelity datasets grounded in real-world statistics.
 
 ## AfriGen Demo[https://youtu.be/nggaI87IDts]
 
@@ -20,28 +20,17 @@ AfriGen fixes this.
 
 ## 🧠 What AfriGen Does
 
-AfriGen is an AI-powered synthetic data infrastructure platform that:
+AfriGen is an AI-powered synthetic data infrastructure platform that turns real-world African statistics into validated, production-ready datasets for machine learning.
 
-1. **Fetches real statistics** from WHO Global Health Observatory and 
-   World Bank Open Data for the requested country and domain
+It starts by pulling real statistical data from the WHO Global Health Observatory and World Bank Open Data based on a selected country and domain. These real-world distributions are then used as grounding signals for Gemini AI, which generates synthetic datasets that reflect actual African health and demographic realities rather than random or generic patterns.
 
-2. **Generates synthetic datasets** using Gemini AI — grounded in real 
-   African statistics, not random values
+Each generated dataset is then evaluated through a fidelity scoring system that measures how closely it aligns with real-world statistical distributions, ensuring the output is not just plausible, but statistically consistent.
 
-3. **Scores every dataset** with a fidelity algorithm that measures data 
-   quality against real-world distributions
+Once validated, every dataset is automatically registered in OpenMetadata with full schema definitions, lineage tracking, and governance metadata, making it fully auditable and discoverable.
 
-4. **Registers every dataset** automatically in OpenMetadata with full 
-   schema, lineage, and governance metadata
+Through the platform, users can browse a live catalog of all generated datasets, enriched with fidelity scores, domain information, country context, and structural metadata such as column composition.
 
-5. **Catalog page** — pulls live from OpenMetadata API, every generated 
-   dataset is discoverable with fidelity scores, domain, country, and 
-   column count
-
-6. **Data Quality page** — validates every dataset before it touches a 
-   training pipeline: completeness check, duplicate detection, PII 
-   scanning, model readiness score, and AI-powered recommendations 
-   from Gemini
+Before any dataset is used for training, AfriGen runs a data quality layer that checks completeness, detects duplicates, scans for sensitive information, and evaluates model readiness, while also providing AI-generated recommendations from Gemini to improve dataset quality.
 
 ## 🏗️ Architecture
 WHO API + World Bank API

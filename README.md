@@ -211,8 +211,8 @@ Generate your first African dataset. Watch it appear in OpenMetadata automatical
 - **Automatic governance** - every dataset is cataloged, tagged, and lineage-tracked
 - **Fidelity scoring** tells you exactly how trustworthy your data is before training
 - Built specifically for **African ML engineers** who have been underserved by 
-  existing tools
+  existing tools.
 
 ## 📄 License
 
-MIT - built with ❤️ for Africa
+MIT - built with ❤️ for Africa.

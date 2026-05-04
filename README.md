@@ -6,7 +6,7 @@
 
 ## 🌐 Live Demo [https://afrigen-gtht.onrender.com](https://afrigen-gtht.onrender.com)
 
-> Note: First load may take 30–60 seconds (Render free tier spins down when inactive).
+> Note: First load may take 30–60 seconds (Render free tier spins down when inactive)
 > For full OpenMetadata catalog integration, run locally with your own instance.
 
 ## 🌍 The Problem

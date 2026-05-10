@@ -215,4 +215,4 @@ Generate your first African dataset. Watch it appear in OpenMetadata automatical
 
 ## 📄 License
 
-MIT - built with ❤️ for Africa
+MIT - built with ❤️ for Africa.
